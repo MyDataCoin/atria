@@ -542,8 +542,9 @@ body::after {
     pointer-events: none;
     background: linear-gradient(
       180deg,
-      transparent 36%,
-      color-mix(in srgb, var(--bone) 90%, transparent) 66%,
+      transparent 20%,
+      color-mix(in srgb, var(--bone) 82%, transparent) 42%,
+      var(--bone) 54%,
       var(--bone) 100%
     );
   }
@@ -640,13 +641,23 @@ body::after {
   .bhero-headline {
     align-self: end;
     max-width: none;
-    padding-bottom: 5.5rem;
+    padding-bottom: 4rem;
   }
   .bhero-headline h1 {
-    font-size: clamp(2.1rem, 8vw, 3rem);
+    font-size: clamp(1.9rem, 7.4vw, 2.6rem);
   }
   .bhero-sub {
-    max-width: 40ch;
+    max-width: 100%;
+    font-size: 0.92rem;
+    margin-top: 0.9rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .bhero-cta {
+    margin-top: 1.3rem;
   }
 }
 
