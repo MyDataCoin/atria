@@ -1415,74 +1415,146 @@ body::after {
 .footer {
   background: var(--ink);
   color: var(--paper);
-  padding-top: clamp(3rem, 6vw, 5rem);
+  padding-top: clamp(4rem, 7vw, 6rem);
 }
+
+/* ── TOP: лого на всю ширину, потом две колонки ── */
 .footer-top {
-  display: grid;
-  grid-template-columns: 1.4fr 1fr 1fr;
-  gap: 2.5rem;
-  padding-bottom: 3rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding-bottom: 2rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
-@media (max-width: 760px) {
-  .footer-top {
-    grid-template-columns: 1fr;
-  }
-}
+
+/* лого — отдельная строка сверху */
 .footer-brand {
-  font-family: 'Cinzel', serif;
-  font-weight: 600;
-  font-size: clamp(2.8rem, 8vw, 5.4rem);
-  letter-spacing: 0.12em;
-  line-height: 1;
   display: flex;
   align-items: center;
-  gap: 1rem;
+  margin-bottom: 2rem;
 }
-.footer-brand .mk {
-  width: clamp(48px, 6vw, 84px);
-  color: var(--amber);
+
+.footer-logo {
+  width: clamp(140px, 18vw, 210px);
+  height: auto;
+  display: block;
 }
+
+/* строка с дисклеймером и компанией рядом */
+.footer-left {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: clamp(3rem, 6vw, 8rem);
+  align-items: start;
+}
+
+/* disclaimer — левая часть */
+.footer-disclaimer {
+  font-size: 0.8rem;
+  line-height: 1.9;
+  color: rgba(255, 255, 255, 0.36);
+  max-width: 58ch;
+  margin: 0;
+}
+
+/* RIGHT — компания */
+.footer-col--company {
+  min-width: 180px;
+  padding-top: 0;
+}
+
 .footer-col h5 {
   font-family: var(--font-mono);
-  font-size: 0.72rem;
-  letter-spacing: 0.06em;
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--amber-bright);
-  margin-bottom: 1.2rem;
+  margin-bottom: 1.1rem;
 }
+
 .footer-col a,
-.footer-col p {
+.footer-link-btn {
   display: block;
-  font-size: 0.95rem;
-  color: rgba(255, 255, 255, 0.7);
-  margin-bottom: 0.7rem;
-  font-weight: 300;
   width: fit-content;
+  font-size: 0.9rem;
+  font-weight: 300;
+  line-height: 1.9;
+  color: rgba(255, 255, 255, 0.65);
+  margin-bottom: 0.1rem;
+  transition: color 0.3s var(--ease), transform 0.3s var(--ease);
 }
+
+.footer-link-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+}
+
+.footer-col a:hover,
+.footer-link-btn:hover {
+  color: var(--paper);
+  transform: translateX(3px);
+}
+
+/* ── BOTTOM BAR ── */
 .footer-bottom {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   gap: 1rem;
   flex-wrap: wrap;
-  padding-block: 1.8rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.14);
+  padding-block: 1.6rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
   font-family: var(--font-mono);
-  font-size: 0.72rem;
-  color: rgba(255, 255, 255, 0.5);
-}
-.footer-disclaimer {
-  max-width: 72ch;
-  font-size: 0.78rem;
-  line-height: 1.6;
-  color: rgba(255, 255, 255, 0.4);
-  padding-bottom: 2.5rem;
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.45);
 }
 
-.reveal-line {
-  display: block;
-  overflow: hidden;
+.footer-contact {
+  white-space: nowrap;
 }
 
+.footer-email {
+  color: rgba(255, 255, 255, 0.45);
+  transition: color 0.3s var(--ease);
+}
+
+.footer-email:hover {
+  color: var(--amber-bright);
+}
+
+/* ── MOBILE ── */
+@media (max-width: 760px) {
+  .footer {
+    padding-top: 3rem;
+  }
+
+  .footer-brand {
+    margin-bottom: 1.6rem;
+  }
+
+  .footer-logo {
+    width: 160px;
+  }
+
+  .footer-left {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+  }
+
+  .footer-col--company {
+    min-width: 0;
+  }
+
+  .footer-bottom {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+}
 /* ============================================================
    SHARED SECTION PRIMITIVES (educational sections)
    ============================================================ */
@@ -3077,5 +3149,87 @@ body::after {
   }
   .reg-code-cell {
     max-width: none;
+  }
+}
+
+/* ============================================================
+   LICENSE MODAL (footer)
+   ============================================================ */
+.lic-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  padding: clamp(1.2rem, 5vw, 3rem) var(--gutter);
+  background: color-mix(in srgb, var(--ink) 55%, transparent);
+  backdrop-filter: blur(6px);
+  overflow-y: auto;
+}
+.lic-card {
+  position: relative;
+  width: min(100%, 480px);
+  max-height: calc(100svh - clamp(2.4rem, 10vw, 6rem));
+  overflow-y: auto;
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  box-shadow: var(--shadow-card);
+  padding: clamp(2rem, 5vw, 2.8rem) clamp(1.6rem, 5vw, 2.4rem);
+}
+.lic-close {
+  position: absolute;
+  top: 1.2rem;
+  right: 1.2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  color: var(--ink-3);
+  transition: color 0.3s var(--ease), background 0.3s var(--ease);
+}
+.lic-close:hover {
+  color: var(--ink);
+  background: var(--bone);
+}
+.lic-badge {
+  display: inline-block;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--amber-deep, var(--amber));
+  background: color-mix(in srgb, var(--amber) 14%, transparent);
+  border-radius: 100px;
+  padding: 0.35em 0.9em;
+  margin-bottom: 1rem;
+}
+.lic-title {
+  font-weight: 380;
+  font-size: clamp(1.4rem, 3vw, 1.7rem);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  margin-bottom: 0.9rem;
+}
+.lic-body {
+  font-size: 0.92rem;
+  color: var(--ink-2);
+  font-weight: 300;
+  line-height: 1.65;
+  margin-bottom: 1.2rem;
+}
+.lic-note {
+  font-size: 0.74rem;
+  letter-spacing: 0.02em;
+  color: var(--ink-3);
+}
+
+@media (max-width: 480px) {
+  .lic-card {
+    border-radius: 16px;
   }
 }
