@@ -1,13 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { requestOtp, verifyOtp } from '../lib/auth.js'
+import { ApiError } from '../lib/api.js'
 
 const EASE = [0.16, 1, 0.3, 1]
 const CODE_LENGTH = 4
-const MOCK_CODE = '1234' // demo only — no backend, any 4-digit code is accepted on verify
 const RESEND_SECONDS = 30
-
-// demo only — the single phone number treated as "already registered" for the login flow
-const EXISTING_PHONE_DIGITS = '700123456' // +996 700 123 456
 
 /**
  * Formats raw digits into a KG-style phone mask: +996 XXX XXX XXX
@@ -29,18 +27,18 @@ function digitsOnly(formatted) {
 }
 
 /**
- * Auth modal — phone number + SMS code, mock flow, no backend.
- * Handles both registration and login with the same UI.
+ * Auth modal — phone number + SMS code over the real Atria phone-OTP flow.
+ * The same UI serves both "register" and "login": the backend's verify-otp
+ * creates the account on first use or signs into the existing one.
  *
  * Usage:
  *   const [mode, setMode] = useState(null) // null | 'register' | 'login'
  *   <Registration mode={mode} onClose={() => setMode(null)} onSuccess={(p) => ...} />
  */
-export default function Registration({ mode, onClose, onSuccess, onSwitchMode }) {
+export default function Registration({ mode, onClose, onSuccess }) {
   const isOpen = mode === 'register' || mode === 'login'
 
-  // steps: 1 = phone, 2 = code, 3 = success, 4 = kyc prompt, 5 = not-found (login only),
-  // 6 = already-registered prompt (register only, leads back into step 2 as a login)
+  // steps: 1 = phone, 2 = code, 3 = success, 4 = kyc prompt
   const [step, setStep] = useState(1)
   const [phone, setPhone] = useState('+996 ')
   const [code, setCode] = useState(Array(CODE_LENGTH).fill(''))
@@ -48,13 +46,11 @@ export default function Registration({ mode, onClose, onSuccess, onSwitchMode })
   const [loading, setLoading] = useState(false)
   const [resendIn, setResendIn] = useState(0)
   const [justResent, setJustResent] = useState(false)
-  const [loginFromRegister, setLoginFromRegister] = useState(false)
 
   const inputsRef = useRef([])
 
   const phoneDigits = digitsOnly(phone)
   const phoneValid = phoneDigits.length === 9
-  const effectiveMode = loginFromRegister ? 'login' : mode
 
   // reset internal state whenever the modal is (re)opened or switches mode
   useEffect(() => {
@@ -66,7 +62,6 @@ export default function Registration({ mode, onClose, onSuccess, onSwitchMode })
       setLoading(false)
       setResendIn(0)
       setJustResent(false)
-      setLoginFromRegister(false)
     }
   }, [isOpen, mode])
 
@@ -104,7 +99,7 @@ export default function Registration({ mode, onClose, onSuccess, onSwitchMode })
     setPhone(formatPhone(e.target.value))
   }
 
-  const handleSendCode = (e) => {
+  const handleSendCode = async (e) => {
     e.preventDefault()
     if (!phoneValid) {
       setError('Введите корректный номер телефона')
@@ -112,25 +107,21 @@ export default function Registration({ mode, onClose, onSuccess, onSwitchMode })
     }
     setError('')
     setLoading(true)
-    // mock "checking phone + sending sms" — no backend
-    setTimeout(() => {
-      setLoading(false)
-      const exists = phoneDigits === EXISTING_PHONE_DIGITS
-
-      if (mode === 'login' && !exists) {
-        setStep(5) // "номер не найден, зарегистрируйтесь"
-        return
-      }
-      if (mode === 'register' && exists) {
-        setStep(6) // "номер уже зарегистрирован, войдите"
-        return
-      }
-
+    try {
+      await requestOtp(phone)
       setStep(2)
       setResendIn(RESEND_SECONDS)
       setCode(Array(CODE_LENGTH).fill(''))
       setTimeout(() => inputsRef.current[0]?.focus(), 50)
-    }, 700)
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 409) {
+        setError('Слишком много запросов кода. Попробуйте позже')
+      } else {
+        setError('Не удалось отправить код. Попробуйте ещё раз')
+      }
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleCodeChange = (i, val) => {
@@ -152,7 +143,7 @@ export default function Registration({ mode, onClose, onSuccess, onSwitchMode })
     }
   }
 
-  const handleVerify = (e) => {
+  const handleVerify = async (e) => {
     e.preventDefault()
     const joined = code.join('')
     if (joined.length < CODE_LENGTH) {
@@ -161,50 +152,43 @@ export default function Registration({ mode, onClose, onSuccess, onSwitchMode })
     }
     setLoading(true)
     setError('')
-    // mock verification — demo code 1234 always works; otherwise any complete code passes too
-    setTimeout(() => {
-      setLoading(false)
-      if (joined !== MOCK_CODE && joined.length !== CODE_LENGTH) {
-        setError('Неверный код, попробуйте снова')
-        return
-      }
-
+    try {
+      const result = await verifyOtp(phone, joined)
       setStep(3)
-      onSuccess?.({ phone, mode: effectiveMode })
-    }, 600)
+      onSuccess?.({ phone, mode, tokens: result })
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 409) {
+        setError('Код заблокирован после нескольких попыток. Запросите новый')
+      } else {
+        setError('Неверный код, попробуйте снова')
+      }
+      setCode(Array(CODE_LENGTH).fill(''))
+      setTimeout(() => inputsRef.current[0]?.focus(), 50)
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const handleResend = () => {
+  const handleResend = async () => {
     if (resendIn > 0 || loading) return
     setLoading(true)
     setError('')
-    // mock "resending sms"
-    setTimeout(() => {
-      setLoading(false)
+    try {
+      await requestOtp(phone)
       setResendIn(RESEND_SECONDS)
       setCode(Array(CODE_LENGTH).fill(''))
       setJustResent(true)
       setTimeout(() => setJustResent(false), 2400)
       setTimeout(() => inputsRef.current[0]?.focus(), 50)
-    }, 600)
-  }
-
-  const goToRegisterFromNotFound = () => {
-    onSwitchMode?.('register')
-  }
-
-  const continueToLoginFromExisting = () => {
-    setLoading(true)
-    setError('')
-    // mock "sending sms" — no backend
-    setTimeout(() => {
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 409) {
+        setError('Слишком много запросов кода. Попробуйте позже')
+      } else {
+        setError('Не удалось отправить код повторно')
+      }
+    } finally {
       setLoading(false)
-      setLoginFromRegister(true)
-      setStep(2)
-      setResendIn(RESEND_SECONDS)
-      setCode(Array(CODE_LENGTH).fill(''))
-      setTimeout(() => inputsRef.current[0]?.focus(), 50)
-    }, 600)
+    }
   }
 
   return (
@@ -235,7 +219,7 @@ export default function Registration({ mode, onClose, onSuccess, onSwitchMode })
               </svg>
             </button>
 
-            <span className="eyebrow">{effectiveMode === 'login' ? 'Вход' : 'Регистрация'}</span>
+            <span className="eyebrow">{mode === 'login' ? 'Вход' : 'Регистрация'}</span>
 
             <AnimatePresence mode="wait">
               {step === 1 && (
@@ -328,7 +312,7 @@ export default function Registration({ mode, onClose, onSuccess, onSwitchMode })
                 </motion.div>
               )}
 
-              {step === 3 && effectiveMode === 'register' && (
+              {step === 3 && mode === 'register' && (
                 <motion.div
                   key="step3-register"
                   initial={{ opacity: 0, y: 12 }}
@@ -358,7 +342,7 @@ export default function Registration({ mode, onClose, onSuccess, onSwitchMode })
                 </motion.div>
               )}
 
-              {step === 3 && effectiveMode === 'login' && (
+              {step === 3 && mode === 'login' && (
                 <motion.div
                   key="step3-login"
                   initial={{ opacity: 0, y: 12 }}
@@ -415,72 +399,6 @@ export default function Registration({ mode, onClose, onSuccess, onSwitchMode })
                   </p>
                   <button className="btn btn-primary reg-submit" onClick={onClose}>
                     <span>Начать</span>
-                    <span className="dot" />
-                  </button>
-                </motion.div>
-              )}
-
-              {step === 5 && (
-                <motion.div
-                  key="step5-notfound"
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -12 }}
-                  transition={{ duration: 0.35, ease: EASE }}
-                  className="reg-success"
-                >
-                  <div className="reg-success-icon reg-success-icon--neutral">
-                    <svg viewBox="0 0 24 24" width="28" height="28">
-                      <path
-                        d="M12 9v4M12 16.5h.01M12 3.5l9 15.5H3l9-15.5z"
-                        stroke="currentColor"
-                        strokeWidth="1.6"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        fill="none"
-                      />
-                    </svg>
-                  </div>
-                  <h2 className="reg-title display">Номер не найден</h2>
-                  <p className="reg-sub">
-                    Аккаунт с номером <span className="reg-phone">{phone}</span> не найден. Вам нужно пройти
-                    регистрацию
-                  </p>
-                  <button className="btn btn-primary reg-submit" onClick={goToRegisterFromNotFound}>
-                    <span>Пройти регистрацию</span>
-                    <span className="dot" />
-                  </button>
-                </motion.div>
-              )}
-
-              {step === 6 && (
-                <motion.div
-                  key="step6-already-registered"
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -12 }}
-                  transition={{ duration: 0.35, ease: EASE }}
-                  className="reg-success"
-                >
-                  <div className="reg-success-icon reg-success-icon--neutral">
-                    <svg viewBox="0 0 24 24" width="28" height="28">
-                      <path
-                        d="M12 9v4M12 16.5h.01M12 3.5l9 15.5H3l9-15.5z"
-                        stroke="currentColor"
-                        strokeWidth="1.6"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        fill="none"
-                      />
-                    </svg>
-                  </div>
-                  <h2 className="reg-title display">Номер уже зарегистрирован</h2>
-                  <p className="reg-sub">
-                    Аккаунт с номером <span className="reg-phone">{phone}</span> уже есть в системе. Выполним
-                    вход
-                  </p>
-                  <button className="btn btn-primary reg-submit" onClick={continueToLoginFromExisting} disabled={loading}>
-                    <span>{loading ? 'Отправка...' : 'Войти по этому номеру'}</span>
                     <span className="dot" />
                   </button>
                 </motion.div>

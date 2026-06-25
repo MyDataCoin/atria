@@ -144,7 +144,6 @@ export default function Nav() {
       <Registration
         mode={authMode}
         onClose={() => setAuthMode(null)}
-        onSwitchMode={(next) => setAuthMode(next)}
       />
     </>
   )
