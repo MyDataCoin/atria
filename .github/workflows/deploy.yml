@@ -2,7 +2,7 @@ name: CI + Deploy
 # Build on every push/PR; deploy the static bundle to the Ubuntu server only on pushes to
 # the default branch (and manual runs). Connection details are GitHub Secrets — nothing
 # sensitive lives in this file. Only three secrets are needed:
-#   DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_PASSWORD, DEPLOY_SSH_PORT
+#   DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_PASSWORD
 on:
   push:
     branches: [main, master]
@@ -63,7 +63,6 @@ jobs:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           password: ${{ secrets.DEPLOY_SSH_PASSWORD }}
-          port: ${{ secrets.DEPLOY_SSH_PORT }}
           source: "deploy.tar.gz"
           target: "/opt/atria-frontend"
           overwrite: true
@@ -74,7 +73,6 @@ jobs:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           password: ${{ secrets.DEPLOY_SSH_PASSWORD }}
-          port: ${{ secrets.DEPLOY_SSH_PORT }}
           script: |
             set -euo pipefail
 
