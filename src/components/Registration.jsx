@@ -4,7 +4,7 @@ import { requestOtp, verifyOtp } from '../lib/auth.js'
 import { ApiError } from '../lib/api.js'
 
 const EASE = [0.16, 1, 0.3, 1]
-const CODE_LENGTH = 4
+const CODE_LENGTH = 6
 const RESEND_SECONDS = 30
 
 /**
@@ -28,7 +28,7 @@ function digitsOnly(formatted) {
 
 /**
  * Auth modal — phone number + SMS code over the real Atria phone-OTP flow.
- * The same UI serves both "register" and "login": the backend's verify-otp
+ * The same UI serves both даregister" and "login": the backend's verify-otp
  * creates the account on first use or signs into the existing one.
  *
  * Usage:
@@ -116,8 +116,14 @@ export default function Registration({ mode, onClose, onSuccess }) {
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
         setError('Слишком много запросов кода. Попробуйте позже')
+      } else if (err instanceof ApiError && err.status === 502) {
+        setError('Сервис отправки SMS временно недоступен. Попробуйте позже')
+      } else if (err instanceof ApiError && err.status >= 500) {
+        setError('Не удалось отправить код. Попробуйте позже')
+      } else if (err instanceof ApiError) {
+        setError(`Ошибка ${err.status}: ${err.message}`)
       } else {
-        setError('Не удалось отправить код. Попробуйте ещё раз')
+        setError('Нет связи с сервером. Проверьте подключение.')
       }
     } finally {
       setLoading(false)

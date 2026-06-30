@@ -4,12 +4,12 @@
 import { apiFetch, tokens } from './api.js'
 
 /**
- * Приводит маску '+996 700 123 456' к формату API '+996700123456'.
+ * Приводит маску '+996 700 123 456' к формату API '996700123456' (без +).
  * Принимает как сырые цифры, так и уже отформатированную строку.
  */
 export function toApiPhone(input) {
   const digits = String(input).replace(/\D/g, '').replace(/^996/, '').slice(0, 9)
-  return `+996${digits}`
+  return `996${digits}`
 }
 
 /** Шаг 1: запросить SMS-код. Возвращает null (204). */
