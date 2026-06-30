@@ -3221,6 +3221,7 @@ body::after {
   line-height: 1.15;
   letter-spacing: -0.02em;
   margin-bottom: 0.9rem;
+  color: var(--ink);
 }
 .lic-body {
   font-size: 0.92rem;
@@ -3232,6 +3233,186 @@ body::after {
 .lic-note {
   font-size: 0.74rem;
   letter-spacing: 0.02em;
+  color: var(--ink-3);
+}
+
+/* ---- Длинный документ (Политика конфиденциальности) ---- */
+.lic-card--doc {
+  width: min(100%, 720px);
+  text-align: left;
+}
+.lic-doc-intro {
+  margin-bottom: 0.4rem;
+}
+.lic-doc {
+  margin-top: 1.4rem;
+  padding-top: 1.4rem;
+  border-top: 1px solid var(--line);
+}
+.lic-doc-section + .lic-doc-section {
+  margin-top: 1.8rem;
+}
+.lic-doc-h {
+  font-weight: 420;
+  font-size: 0.98rem;
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  margin-bottom: 0.7rem;
+}
+.lic-doc-p,
+.lic-doc-sub {
+  font-size: 0.88rem;
+  font-weight: 300;
+  line-height: 1.7;
+  color: var(--ink-2);
+}
+.lic-doc-p + .lic-doc-p,
+.lic-doc-p + .lic-doc-sub,
+.lic-doc-sub + .lic-doc-p {
+  margin-top: 0.7rem;
+}
+.lic-doc-sub {
+  color: var(--ink);
+  font-weight: 360;
+  margin-top: 0.9rem;
+}
+.lic-doc-list {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+}
+.lic-doc-list li {
+  position: relative;
+  padding-left: 1.1rem;
+  font-size: 0.86rem;
+  font-weight: 300;
+  line-height: 1.65;
+  color: var(--ink-2);
+}
+.lic-doc-list li + li {
+  margin-top: 0.45rem;
+}
+.lic-doc-list li::before {
+  content: '';
+  position: absolute;
+  left: 0.1rem;
+  top: 0.68em;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--amber, currentColor);
+}
+/* нумерованный список */
+.lic-doc-list--ol {
+  counter-reset: lic-ol;
+}
+.lic-doc-list--ol li {
+  padding-left: 1.6rem;
+  counter-increment: lic-ol;
+}
+.lic-doc-list--ol li::before {
+  content: counter(lic-ol) ')';
+  top: 0;
+  left: 0;
+  width: auto;
+  height: auto;
+  border-radius: 0;
+  background: none;
+  color: var(--amber-deep, var(--amber));
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+}
+
+/* таблица данные / цель / срок */
+.lic-doc-tablewrap {
+  margin-top: 0.6rem;
+  overflow-x: auto;
+}
+.lic-doc-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.84rem;
+  font-weight: 300;
+  line-height: 1.55;
+  color: var(--ink-2);
+}
+.lic-doc-table th,
+.lic-doc-table td {
+  text-align: left;
+  vertical-align: top;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--line);
+}
+.lic-doc-table th {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink);
+  background: var(--bone);
+}
+.lic-doc-table td:first-child {
+  color: var(--ink);
+  font-weight: 360;
+  width: 28%;
+}
+.lic-doc-table td:last-child {
+  white-space: nowrap;
+  color: var(--ink-3);
+}
+
+/* поля для заполнения (Я ___, контактные данные ___) */
+.lic-doc-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.lic-doc-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.lic-doc-field-line {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  border-bottom: 1px solid var(--line);
+  min-height: 1.6rem;
+}
+.lic-doc-field-label {
+  font-size: 0.88rem;
+  color: var(--ink);
+  font-weight: 360;
+}
+.lic-doc-field-hint {
+  font-size: 0.72rem;
+  color: var(--ink-3);
+  font-style: italic;
+}
+
+/* строка подписи */
+.lic-doc-sign {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.6rem;
+  margin-top: 1.8rem;
+}
+.lic-doc-sign-cell {
+  flex: 1 1 120px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+}
+.lic-doc-sign-line {
+  width: 100%;
+  border-bottom: 1px solid var(--line);
+  height: 1.4rem;
+}
+.lic-doc-sign-label {
+  font-size: 0.72rem;
   color: var(--ink-3);
 }
 
