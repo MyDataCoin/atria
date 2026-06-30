@@ -57,17 +57,17 @@ jobs:
         # Pack only the contents of dist/ (the -C avoids nesting a dist/ folder in the tar).
         run: tar -czf deploy.tar.gz -C dist .
 
-      - name: Copy bundle to server
+      - name: Copy bundle + nginx config to server
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           password: ${{ secrets.DEPLOY_SSH_PASSWORD }}
-          source: "deploy.tar.gz"
+          source: "deploy.tar.gz,deploy/nginx.conf"
           target: "/opt/atria-frontend"
           overwrite: true
 
-      - name: Unpack into the web root on the server
+      - name: Unpack site + install nginx config
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.DEPLOY_HOST }}
@@ -81,6 +81,7 @@ jobs:
 
             cd /opt/atria-frontend
 
+            # ── 1. Deploy static files ──
             # Stage the new files in a temp dir, then swap atomically so visitors never see a
             # half-written site. Wipe the staging dir first to drop files removed in git.
             rm -rf release
@@ -93,7 +94,14 @@ jobs:
             sudo cp -r release/. "$WEB_ROOT"/
             rm -rf release
 
-            # Pick up the new files immediately.
+            # ── 2. Install nginx config (adds the /api proxy + SPA routing) ──
+            # scp preserves the "deploy/" prefix, so the file lands here.
+            sudo cp /opt/atria-frontend/deploy/nginx.conf /etc/nginx/sites-available/atria
+            sudo ln -sf /etc/nginx/sites-available/atria /etc/nginx/sites-enabled/atria
+            # The stock "default" site can shadow ours on port 80/443 — drop its symlink.
+            sudo rm -f /etc/nginx/sites-enabled/default
+
+            # ── 3. Validate & reload (only reload if the config is valid) ──
             sudo nginx -t && sudo systemctl reload nginx
 
             ls -la "$WEB_ROOT"
