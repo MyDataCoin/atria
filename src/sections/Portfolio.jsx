@@ -1,12 +1,93 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Accent } from '../lib/accent.jsx'
 import SHead from '../components/SHead.jsx'
 import Reveal from '../components/Reveal.jsx'
 import { useContent } from '../i18n.jsx'
+import { listProperties } from '../lib/properties.js'
+import PurchaseModal from '../components/PurchaseModal.jsx'
+import DetailsModal from '../components/DetailsModal.jsx'
 
-function PCard({ p, i, ui }) {
+// Запасные градиенты для карточек без фото (бэкенд пока не отдаёт изображения).
+const GRADIENTS = [
+  'linear-gradient(165deg, #2f3b44 0%, #6d7d6f 55%, #d8b483 110%)',
+  'linear-gradient(165deg, #3a3340 0%, #7d6f75 55%, #d8c4b4 110%)',
+  'linear-gradient(165deg, #2f4440 0%, #6f7d78 55%, #b4d8c8 110%)',
+  'linear-gradient(165deg, #44402f 0%, #7d786f 55%, #d8d0b4 110%)',
+  'linear-gradient(165deg, #2f3644 0%, #6f747d 55%, #b4c0d8 110%)',
+]
+
+const fmt = (n) => new Intl.NumberFormat('ru-RU').format(Number(n) || 0)
+
+/** Метка статуса по ключу — берём из фильтров контента, чтобы не дублировать переводы. */
+function statusLabel(filters, key) {
+  return filters.find((f) => f.key === key)?.label || ''
+}
+
+/**
+ * PropertyDto бэкенда → вью-модель карточки.
+ * Поля, которых нет в API (площадь, заполняемость, арендаторы), просто опускаем —
+ * карточка рендерит метрики и детали по факту наличия.
+ */
+function fromApi(dto, i, ui, filters) {
+  const total = Number(dto.totalTokens) || 0
+  const available = Number(dto.availableTokens ?? total) || 0
+  const bought = total > 0 ? Math.round(((total - available) / total) * 100) : 0
+
+  let statusKey = 'open'
+  if (dto.isActive === false) statusKey = 'soon'
+  else if (available <= 0) statusKey = 'sold'
+
+  const currency = dto.currency || ''
+  return {
+    id: dto.id,
+    name: dto.name || '—',
+    loc: currency,
+    type: dto.description || '',
+    bg: GRADIENTS[i % GRADIENTS.length],
+    metrics: [
+      { k: ui.mTokenPrice, v: `${fmt(dto.tokenPrice)} ${currency}`.trim() },
+      { k: ui.mTotalTokens, v: fmt(total) },
+      { k: ui.mAvailable, v: fmt(available) },
+      { k: ui.mBought, v: `${bought}%` },
+    ],
+    bought,
+    statusKey,
+    status: statusLabel(filters, statusKey),
+    details: [],
+    raw: dto, // полный объект для модалки покупки
+  }
+}
+
+/** Статический элемент контента → та же вью-модель (используется как fallback при ошибке). */
+function fromStatic(p, ui) {
+  return {
+    id: p.name,
+    name: p.name,
+    loc: p.district,
+    type: p.type,
+    img: p.img,
+    bg: p.bg,
+    metrics: [
+      { k: ui.mPrice, v: p.price, unit: true },
+      { k: ui.mArea, v: p.area },
+      { k: ui.mOcc, v: `${p.occupancy}%` },
+      { k: ui.mBought, v: `${p.bought}%` },
+    ],
+    bought: p.bought,
+    statusKey: p.statusKey,
+    status: p.status,
+    details: [
+      { k: ui.tenants, v: p.tenants },
+      { k: ui.spv, v: p.spv },
+    ],
+  }
+}
+
+function PCard({ p, i, ui, onBuy, onDetails }) {
   const [open, setOpen] = useState(false)
+  const hasDetails = p.details && p.details.length > 0
+  const canBuy = p.raw && p.statusKey !== 'sold'
   return (
     <Reveal as="article" className="pcard" delay={i * 0.08} y={28} amount={0.15}>
       <div
@@ -16,30 +97,26 @@ function PCard({ p, i, ui }) {
         <span className={`pcard-badge ${p.statusKey}`}>{p.status}</span>
       </div>
       <div className="pcard-body">
-        <span className="loc">{p.district}</span>
+        {p.loc && <span className="loc">{p.loc}</span>}
         <h3>{p.name}</h3>
-        <span className="ptype">{p.type}</span>
+        {p.type && <span className="ptype">{p.type}</span>}
 
         <div className="pcard-metrics">
-          <div>
-            <span className="mk">{ui.mPrice}</span>
-            <span className="mv">
-              <span className="u">{p.price[0]}</span>
-              {p.price.slice(1)}
-            </span>
-          </div>
-          <div>
-            <span className="mk">{ui.mArea}</span>
-            <span className="mv">{p.area}</span>
-          </div>
-          <div>
-            <span className="mk">{ui.mOcc}</span>
-            <span className="mv">{p.occupancy}%</span>
-          </div>
-          <div>
-            <span className="mk">{ui.mBought}</span>
-            <span className="mv">{p.bought}%</span>
-          </div>
+          {p.metrics.map((m) => (
+            <div key={m.k}>
+              <span className="mk">{m.k}</span>
+              <span className="mv">
+                {m.unit && typeof m.v === 'string' ? (
+                  <>
+                    <span className="u">{m.v[0]}</span>
+                    {m.v.slice(1)}
+                  </>
+                ) : (
+                  m.v
+                )}
+              </span>
+            </div>
+          ))}
         </div>
 
         <div className="pbar-head">
@@ -59,43 +136,59 @@ function PCard({ p, i, ui }) {
           />
         </div>
 
-        <button
-          className="more"
-          onClick={() => setOpen((v) => !v)}
-          aria-expanded={open}
-          style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: '0.66rem',
-            letterSpacing: '0.06em',
-            textTransform: 'uppercase',
-            color: 'var(--amber-deep, var(--amber))',
-            marginTop: '0.3rem',
-            textAlign: 'left',
-          }}
-        >
-          {open ? ui.detailsHide : ui.detailsShow}
-        </button>
-        <AnimatePresence initial={false}>
-          {open && (
-            <motion.div
-              className="pcard-detail"
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-              style={{ overflow: 'hidden' }}
+        {hasDetails && (
+          <>
+            <button
+              className="more"
+              onClick={() => setOpen((v) => !v)}
+              aria-expanded={open}
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: '0.66rem',
+                letterSpacing: '0.06em',
+                textTransform: 'uppercase',
+                color: 'var(--amber-deep, var(--amber))',
+                marginTop: '0.3rem',
+                textAlign: 'left',
+              }}
             >
-              <div>
-                <span className="dl">{ui.tenants}</span>
-                {p.tenants}
-              </div>
-              <div>
-                <span className="dl">{ui.spv}</span>
-                {p.spv}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+              {open ? ui.detailsHide : ui.detailsShow}
+            </button>
+            <AnimatePresence initial={false}>
+              {open && (
+                <motion.div
+                  className="pcard-detail"
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+                  style={{ overflow: 'hidden' }}
+                >
+                  {p.details.map((d) => (
+                    <div key={d.k}>
+                      <span className="dl">{d.k}</span>
+                      {d.v}
+                    </div>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </>
+        )}
+
+        {p.raw && (
+          <div className="pcard-actions">
+            <button className="btn btn-ghost" onClick={() => onDetails(p.raw)}>
+              <span>{ui.more || 'Подробнее'}</span>
+            </button>
+            {canBuy && (
+              <button className="btn btn-primary" onClick={() => onBuy(p.raw)}>
+                <span>{ui.buy || 'Купить'}</span>
+                <span className="dot" />
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </Reveal>
   )
@@ -103,8 +196,43 @@ function PCard({ p, i, ui }) {
 
 export default function Portfolio() {
   const c = useContent().portfolio
+  const { ui, filters } = c
+
   const [filter, setFilter] = useState('all')
-  const items = filter === 'all' ? c.items : c.items.filter((p) => p.statusKey === filter)
+  const [state, setState] = useState({ status: 'loading', cards: [] })
+  const [buying, setBuying] = useState(null) // выбранный объект для покупки
+  const [details, setDetails] = useState(null) // выбранный объект для «Подробнее»
+
+  useEffect(() => {
+    let alive = true
+    setState({ status: 'loading', cards: [] })
+    listProperties()
+      .then((data) => {
+        if (!alive) return
+        const list = Array.isArray(data) ? data : []
+        setState({
+          status: 'ready',
+          cards: list.map((dto, i) => fromApi(dto, i, ui, filters)),
+        })
+      })
+      .catch(() => {
+        if (!alive) return
+        // Бэкенд недоступен — показываем статические объекты как запасной вариант.
+        setState({
+          status: 'error',
+          cards: (c.items || []).map((p) => fromStatic(p, ui)),
+        })
+      })
+    return () => {
+      alive = false
+    }
+    // ui/filters/items берутся из одного объекта контента — пересобираем при смене языка
+  }, [c, ui, filters])
+
+  const items = useMemo(
+    () => (filter === 'all' ? state.cards : state.cards.filter((p) => p.statusKey === filter)),
+    [filter, state.cards],
+  )
 
   return (
     <section className={`section surface-${c.surface}`} id={c.id}>
@@ -112,7 +240,7 @@ export default function Portfolio() {
         <SHead eyebrow={c.eyebrow} headline={c.headline} sub={c.subhead} />
 
         <div className="chips">
-          {c.filters.map((f) => (
+          {filters.map((f) => (
             <button
               key={f.key}
               className={`chip-btn ${filter === f.key ? 'on' : ''}`}
@@ -122,17 +250,26 @@ export default function Portfolio() {
             </button>
           ))}
           <span className="count">
-            {items.length} {c.ui.count}
+            {items.length} {ui.count}
           </span>
         </div>
+
+        {state.status === 'loading' && <p className="s-note">{ui.loading}</p>}
+        {state.status === 'error' && <p className="reg-error">{ui.errorText}</p>}
+        {state.status === 'ready' && items.length === 0 && (
+          <p className="s-note">{ui.empty}</p>
+        )}
 
         <motion.div className="pgrid" layout>
           <AnimatePresence>
             {items.map((p, i) => (
-              <PCard key={p.name} p={p} i={i} ui={c.ui} />
+              <PCard key={p.id} p={p} i={i} ui={ui} onBuy={setBuying} onDetails={setDetails} />
             ))}
           </AnimatePresence>
         </motion.div>
+
+        <PurchaseModal property={buying} onClose={() => setBuying(null)} />
+        <DetailsModal property={details} onClose={() => setDetails(null)} />
 
         <Reveal as="div" className="port-strip">
           <p>
