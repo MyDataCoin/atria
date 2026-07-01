@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { requestOtp, verifyOtp } from '../lib/auth.js'
-import { submitKyc, getKycStatus, KycStatus, attachWallet, isValidWallet } from '../lib/kyc.js'
+import { submitKyc, getKycStatus, attachWallet, isValidWallet } from '../lib/kyc.js'
 import { openDiditVerification } from '../lib/didit.js'
 import { ApiError } from '../lib/api.js'
 
@@ -63,7 +63,6 @@ export default function Registration({ mode, onClose, onSuccess }) {
   const [loading, setLoading] = useState(false)
   const [resendIn, setResendIn] = useState(0)
   const [justResent, setJustResent] = useState(false)
-  const [kycResult, setKycResult] = useState(null) // KycStatusDto после возврата из Didit
   const [wallet, setWallet] = useState('') // адрес криптокошелька инвестора
 
   const inputsRef = useRef([])
@@ -81,7 +80,6 @@ export default function Registration({ mode, onClose, onSuccess }) {
       setLoading(false)
       setResendIn(0)
       setJustResent(false)
-      setKycResult(null)
       setWallet('')
     }
   }, [isOpen, mode])
@@ -263,15 +261,15 @@ export default function Registration({ mode, onClose, onSuccess }) {
         return
       }
 
-      // Завершено. Дальше — привязка криптокошелька (решение KYC прилетит webhook'ом отдельно).
-      setStep(6)
+      // Завершено. Показываем экран «проверка пройдена» с кнопкой «Следующий этап» → кошелёк.
+      setStep(5)
     } catch (err) {
       if (err instanceof ApiError && err.status === 400) {
         // KYC уже пройден/начат для этого юзера — сама верификация повторно не нужна.
-        // Если профиль существует, ведём сразу на привязку кошелька (шаг 6).
+        // Если профиль существует, ведём на экран «пройдено» → «Следующий этап» → кошелёк.
         const profile = await getKycStatus().catch(() => null)
         if (profile) {
-          setStep(6)
+          setStep(5)
         } else {
           setError('Проверка личности уже начата или завершена')
         }
@@ -287,21 +285,6 @@ export default function Registration({ mode, onClose, onSuccess }) {
       } else {
         setError('Не удалось запустить проверку. Попробуйте позже')
       }
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  // Шаг 5: перечитать статус KYC (webhook мог прийти уже после закрытия модалки).
-  const handleRefreshKyc = async () => {
-    if (loading) return
-    setLoading(true)
-    setError('')
-    try {
-      const profile = await getKycStatus()
-      setKycResult(profile || { status: KycStatus.Pending })
-    } catch {
-      setError('Не удалось обновить статус. Попробуйте ещё раз')
     } finally {
       setLoading(false)
     }
@@ -570,60 +553,20 @@ export default function Registration({ mode, onClose, onSuccess }) {
                   className="reg-success"
                 >
                   <div className="reg-success-icon">
-                    {kycResult?.status === KycStatus.Approved ? (
-                      <svg viewBox="0 0 24 24" width="28" height="28">
-                        <path d="M4 12.5L9.5 18L20 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-                      </svg>
-                    ) : kycResult?.status === KycStatus.Rejected ? (
-                      <svg viewBox="0 0 24 24" width="28" height="28">
-                        <path d="M6 6L18 18M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                      </svg>
-                    ) : (
-                      <svg viewBox="0 0 24 24" width="28" height="28">
-                        <path d="M12 7v5l3 2M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-                      </svg>
-                    )}
+                    <svg viewBox="0 0 24 24" width="28" height="28">
+                      <path d="M4 12.5L9.5 18L20 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                    </svg>
                   </div>
 
-                  {kycResult?.status === KycStatus.Approved ? (
-                    <>
-                      <h2 className="reg-title display">KYC пройден</h2>
-                      <p className="reg-sub">Личность подтверждена — можно оформлять покупку</p>
-                    </>
-                  ) : kycResult?.status === KycStatus.Rejected ? (
-                    <>
-                      <h2 className="reg-title display">Проверка отклонена</h2>
-                      <p className="reg-sub">
-                        {kycResult?.rejectionReason || 'К сожалению, проверка не пройдена. Обратитесь в поддержку'}
-                      </p>
-                    </>
-                  ) : (
-                    <>
-                      <h2 className="reg-title display">Проверка на рассмотрении</h2>
-                      <p className="reg-sub">
-                        Мы получили ваши данные. Результат появится после проверки — обновите статус
-                        через минуту.
-                      </p>
-                    </>
-                  )}
+                  <h2 className="reg-title display">Проверка личности пройдена</h2>
+                  <p className="reg-sub">
+                    Остался последний шаг — привяжите криптокошелёк для зачисления токенов.
+                  </p>
 
-                  {error && <div className="reg-error">{error}</div>}
-
-                  {kycResult?.status === KycStatus.Approved ? (
-                    <button className="btn btn-primary reg-submit" onClick={onClose}>
-                      <span>Готово</span>
-                      <span className="dot" />
-                    </button>
-                  ) : (
-                    <button
-                      className="btn btn-primary reg-submit"
-                      onClick={handleRefreshKyc}
-                      disabled={loading}
-                    >
-                      <span>{loading ? 'Обновляем…' : 'Проверить статус'}</span>
-                      <span className="dot" />
-                    </button>
-                  )}
+                  <button className="btn btn-primary reg-submit" onClick={() => setStep(6)}>
+                    <span>Следующий этап</span>
+                    <span className="dot" />
+                  </button>
                 </motion.div>
               )}
 
