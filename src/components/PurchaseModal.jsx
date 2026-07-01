@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { createApplication } from '../lib/applications.js'
+import { getKycStatus, isKycApproved, KycStatus } from '../lib/kyc.js'
 import { ApiError, tokens } from '../lib/api.js'
 
 const EASE = [0.16, 1, 0.3, 1]
@@ -67,6 +68,19 @@ export default function PurchaseModal({ property, onClose, onSuccess }) {
     setStatus('loading')
     setError('')
     try {
+      // Гейт по KYC: заявку можно оформлять только с подтверждённой личностью.
+      const kyc = await getKycStatus()
+      if (!isKycApproved(kyc)) {
+        setStatus('error')
+        if (!kyc) {
+          setError('Сначала пройдите проверку личности (KYC) в профиле')
+        } else if (kyc.status === KycStatus.Rejected) {
+          setError(kyc.rejectionReason || 'Проверка личности отклонена. Обратитесь в поддержку')
+        } else {
+          setError('Проверка личности ещё не завершена. Дождитесь подтверждения KYC')
+        }
+        return
+      }
       const app = await createApplication(property.id, calc.investment)
       setStatus('done')
       onSuccess?.(app)

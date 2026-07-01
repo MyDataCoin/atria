@@ -1,11 +1,18 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { requestOtp, verifyOtp } from '../lib/auth.js'
+import { submitKyc, getKycStatus, KycStatus } from '../lib/kyc.js'
+import { openDiditVerification } from '../lib/didit.js'
 import { ApiError } from '../lib/api.js'
 
 const EASE = [0.16, 1, 0.3, 1]
 const CODE_LENGTH = 6
 const RESEND_SECONDS = 30
+
+// DEV: временно можно проматывать телефон + SMS-код и открывать модалку сразу на «Пройдите KYC».
+// Флоу регистрации по номеру НЕ удалён — управляется этим флагом.
+// true = сразу KYC (для отладки), false = обычный путь: телефон → код → успех → KYC.
+const KYC_ONLY_DEV = false
 
 /**
  * Formats raw digits into a KG-style phone mask: +996 XXX XXX XXX
@@ -38,7 +45,7 @@ function digitsOnly(formatted) {
 export default function Registration({ mode, onClose, onSuccess }) {
   const isOpen = mode === 'register' || mode === 'login'
 
-  // steps: 1 = phone, 2 = code, 3 = success, 4 = kyc prompt
+  // steps: 1 = phone, 2 = code, 3 = success, 4 = kyc prompt, 5 = kyc result
   const [step, setStep] = useState(1)
   const [phone, setPhone] = useState('+996 ')
   const [code, setCode] = useState(Array(CODE_LENGTH).fill(''))
@@ -46,6 +53,7 @@ export default function Registration({ mode, onClose, onSuccess }) {
   const [loading, setLoading] = useState(false)
   const [resendIn, setResendIn] = useState(0)
   const [justResent, setJustResent] = useState(false)
+  const [kycResult, setKycResult] = useState(null) // KycStatusDto после возврата из Didit
 
   const inputsRef = useRef([])
 
@@ -55,13 +63,14 @@ export default function Registration({ mode, onClose, onSuccess }) {
   // reset internal state whenever the modal is (re)opened or switches mode
   useEffect(() => {
     if (isOpen) {
-      setStep(1)
+      setStep(KYC_ONLY_DEV ? 4 : 1)
       setPhone('+996 ')
       setCode(Array(CODE_LENGTH).fill(''))
       setError('')
       setLoading(false)
       setResendIn(0)
       setJustResent(false)
+      setKycResult(null)
     }
   }, [isOpen, mode])
 
@@ -192,6 +201,72 @@ export default function Registration({ mode, onClose, onSuccess }) {
       } else {
         setError('Не удалось отправить код повторно')
       }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Шаг 4: открыть сессию KYC на бэкенде и запустить hosted-флоу Didit в модалке.
+  // Бэкенд (POST /kyc/submit) сам ходит в Didit с секретами и отдаёт нам verificationUrl.
+  const handleStartKyc = async () => {
+    if (loading) return
+    setLoading(true)
+    setError('')
+    try {
+      const { verificationUrl } = await submitKyc()
+      if (!verificationUrl) {
+        setError('Не удалось получить ссылку верификации. Попробуйте позже')
+        setLoading(false)
+        return
+      }
+      // Открываем модалку Didit; промис резолвится, когда пользователь её закрыл.
+      const result = await openDiditVerification(verificationUrl)
+
+      // Юзер закрыл проверку не завершив — просто закрываем модалку, без экрана результата.
+      if (result?.type === 'cancelled') {
+        onClose?.()
+        return
+      }
+      // Флоу упал (камера/сессия/сеть) — остаёмся на шаге 4, даём повторить.
+      if (result?.type === 'failed') {
+        setError('Проверку не удалось завершить. Попробуйте ещё раз')
+        return
+      }
+
+      // Завершено. Результат SDK — лишь подсказка; итог берём из /kyc/me (его пишет webhook).
+      const profile = await getKycStatus()
+      setKycResult(profile || { status: KycStatus.Pending })
+      setStep(5)
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 400) {
+        setError('Проверка личности уже начата или завершена')
+      } else if (err instanceof ApiError && err.status === 401) {
+        setError('Нужна авторизация: сначала войдите по номеру телефона')
+      } else if (err instanceof ApiError && err.status >= 500) {
+        // 500 на /kyc/submit = бэкенд не смог открыть сессию у провайдера (Didit).
+        // correlationId из ProblemDetails пригодится бэкенд-разрабу для поиска в логах.
+        console.error('KYC submit failed:', err.status, err.problem)
+        setError('Сервис верификации временно недоступен. Попробуйте позже')
+      } else if (err instanceof ApiError) {
+        setError(`Ошибка ${err.status}: ${err.message}`)
+      } else {
+        setError('Не удалось запустить проверку. Попробуйте позже')
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Шаг 5: перечитать статус KYC (webhook мог прийти уже после закрытия модалки).
+  const handleRefreshKyc = async () => {
+    if (loading) return
+    setLoading(true)
+    setError('')
+    try {
+      const profile = await getKycStatus()
+      setKycResult(profile || { status: KycStatus.Pending })
+    } catch {
+      setError('Не удалось обновить статус. Попробуйте ещё раз')
     } finally {
       setLoading(false)
     }
@@ -403,10 +478,82 @@ export default function Registration({ mode, onClose, onSuccess }) {
                   <p className="reg-sub">
                     Для начала работы с нами подтвердите личность — это займёт несколько минут
                   </p>
-                  <button className="btn btn-primary reg-submit" onClick={onClose}>
-                    <span>Начать</span>
+                  {error && <div className="reg-error">{error}</div>}
+                  <button
+                    className="btn btn-primary reg-submit"
+                    onClick={handleStartKyc}
+                    disabled={loading}
+                  >
+                    <span>{loading ? 'Открываем проверку…' : 'Начать'}</span>
                     <span className="dot" />
                   </button>
+                </motion.div>
+              )}
+
+              {step === 5 && (
+                <motion.div
+                  key="step5-kyc-result"
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -12 }}
+                  transition={{ duration: 0.35, ease: EASE }}
+                  className="reg-success"
+                >
+                  <div className="reg-success-icon">
+                    {kycResult?.status === KycStatus.Approved ? (
+                      <svg viewBox="0 0 24 24" width="28" height="28">
+                        <path d="M4 12.5L9.5 18L20 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                      </svg>
+                    ) : kycResult?.status === KycStatus.Rejected ? (
+                      <svg viewBox="0 0 24 24" width="28" height="28">
+                        <path d="M6 6L18 18M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                      </svg>
+                    ) : (
+                      <svg viewBox="0 0 24 24" width="28" height="28">
+                        <path d="M12 7v5l3 2M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                      </svg>
+                    )}
+                  </div>
+
+                  {kycResult?.status === KycStatus.Approved ? (
+                    <>
+                      <h2 className="reg-title display">KYC пройден</h2>
+                      <p className="reg-sub">Личность подтверждена — можно оформлять покупку</p>
+                    </>
+                  ) : kycResult?.status === KycStatus.Rejected ? (
+                    <>
+                      <h2 className="reg-title display">Проверка отклонена</h2>
+                      <p className="reg-sub">
+                        {kycResult?.rejectionReason || 'К сожалению, проверка не пройдена. Обратитесь в поддержку'}
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <h2 className="reg-title display">Проверка на рассмотрении</h2>
+                      <p className="reg-sub">
+                        Мы получили ваши данные. Результат появится после проверки — обновите статус
+                        через минуту.
+                      </p>
+                    </>
+                  )}
+
+                  {error && <div className="reg-error">{error}</div>}
+
+                  {kycResult?.status === KycStatus.Approved ? (
+                    <button className="btn btn-primary reg-submit" onClick={onClose}>
+                      <span>Готово</span>
+                      <span className="dot" />
+                    </button>
+                  ) : (
+                    <button
+                      className="btn btn-primary reg-submit"
+                      onClick={handleRefreshKyc}
+                      disabled={loading}
+                    >
+                      <span>{loading ? 'Обновляем…' : 'Проверить статус'}</span>
+                      <span className="dot" />
+                    </button>
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>
