@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useContent, useLang } from '../i18n.jsx'
 import Registration from './Registration.jsx'
+import { tokens } from '../lib/api.js'
+import { getKycStatus, KycStatus } from '../lib/kyc.js'
 
 const EASE = [0.16, 1, 0.3, 1]
 
@@ -19,6 +21,21 @@ export default function Nav() {
     onScroll()
     window.addEventListener('scroll', onScroll, { passive: true })
     return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+
+  // Возобновление KYC: если юзер авторизован, но у него есть незавершённый KYC-профиль
+  // (не Approved) — при заходе на сайт сразу открываем модалку на шаге «Пройдите KYC».
+  useEffect(() => {
+    if (!tokens.isAuthed) return
+    let alive = true
+    getKycStatus()
+      .then((p) => {
+        if (alive && p && p.status !== KycStatus.Approved) setAuthMode('login')
+      })
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
   }, [])
 
   // lock body scroll while the mobile menu is open, and auto-close on resize

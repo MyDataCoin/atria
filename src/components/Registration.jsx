@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { requestOtp, verifyOtp } from '../lib/auth.js'
-import { submitKyc, getKycStatus, attachWallet, isValidWallet } from '../lib/kyc.js'
+import { submitKyc, getKycStatus, KycStatus, attachWallet, isValidWallet } from '../lib/kyc.js'
 import { openDiditVerification } from '../lib/didit.js'
-import { ApiError } from '../lib/api.js'
+import { ApiError, tokens } from '../lib/api.js'
 
 const EASE = [0.16, 1, 0.3, 1]
 const CODE_LENGTH = 6
@@ -73,7 +73,6 @@ export default function Registration({ mode, onClose, onSuccess }) {
   // reset internal state whenever the modal is (re)opened or switches mode
   useEffect(() => {
     if (isOpen) {
-      setStep(KYC_ONLY_DEV ? 4 : 1)
       setPhone('+996 ')
       setCode(Array(CODE_LENGTH).fill(''))
       setError('')
@@ -81,6 +80,24 @@ export default function Registration({ mode, onClose, onSuccess }) {
       setResendIn(0)
       setJustResent(false)
       setWallet('')
+
+      // Куда открывать модалку:
+      // • не авторизован → телефон (шаг 1);
+      // • авторизован (или dev-обход) → пропускаем телефон и ведём на KYC (шаг 4) —
+      //   это же возобновляет прерванную проверку при повторном входе;
+      // • если KYC уже пройден (Approved) → на success (шаг 5) → кошелёк.
+      if (KYC_ONLY_DEV || tokens.isAuthed) {
+        setStep(4)
+        if (tokens.isAuthed) {
+          getKycStatus()
+            .then((p) => {
+              if (p?.status === KycStatus.Approved) setStep(5)
+            })
+            .catch(() => {})
+        }
+      } else {
+        setStep(1)
+      }
     }
   }, [isOpen, mode])
 
@@ -265,11 +282,16 @@ export default function Registration({ mode, onClose, onSuccess }) {
       setStep(5)
     } catch (err) {
       if (err instanceof ApiError && err.status === 400) {
-        // KYC уже пройден/начат для этого юзера — сама верификация повторно не нужна.
-        // Если профиль существует, ведём на экран «пройдено» → «Следующий этап» → кошелёк.
+        // KYC уже пройден/начат — смотрим реальный статус профиля.
         const profile = await getKycStatus().catch(() => null)
-        if (profile) {
-          setStep(5)
+        if (profile?.status === KycStatus.Approved) {
+          setStep(5) // верифицирован → «Следующий этап» → кошелёк
+        } else if (profile?.status === KycStatus.Rejected) {
+          setError(profile.rejectionReason || 'Проверка личности отклонена. Обратитесь в поддержку')
+        } else if (profile) {
+          // UnderReview/Pending: сессия открыта, но не завершена. Пересоздать её фронт не может
+          // (бэкенд запрещает ресабмит и не отдаёт verificationUrl) — нужна доработка бэка.
+          setError('Проверка уже идёт. Завершите её или обратитесь в поддержку')
         } else {
           setError('Проверка личности уже начата или завершена')
         }
