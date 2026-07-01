@@ -14,6 +14,14 @@ const RESEND_SECONDS = 30
 // true = сразу KYC (для отладки), false = обычный путь: телефон → код → успех → KYC.
 const KYC_ONLY_DEV = false
 
+// DEV-ЗАГЛУШКА OTP: SMS-провайдер лежит, отправка кода недоступна.
+// При true «Получить код» НЕ дёргает SMS-шлюз (иначе 502), а сразу пускает на ввод
+// кода и подставляет STUB_OTP_CODE. Сам код всё равно проверяется на бэкенде —
+// бэкенд должен принимать этот номер как magic-code на время простоя провайдера
+// и возвращать реальный JWT. Верни false, когда SMS починят.
+const DEV_STUB_OTP = true
+const STUB_OTP_CODE = '111111'
+
 /**
  * Formats raw digits into a KG-style phone mask: +996 XXX XXX XXX
  */
@@ -115,6 +123,14 @@ export default function Registration({ mode, onClose, onSuccess }) {
       return
     }
     setError('')
+    // DEV-заглушка: SMS не отправляем (шлюз лежит) — сразу к вводу кода с подставленным 111111.
+    if (DEV_STUB_OTP) {
+      setStep(2)
+      setResendIn(RESEND_SECONDS)
+      setCode(STUB_OTP_CODE.padEnd(CODE_LENGTH, '').slice(0, CODE_LENGTH).split(''))
+      setTimeout(() => inputsRef.current[0]?.focus(), 50)
+      return
+    }
     setLoading(true)
     try {
       await requestOtp(phone)
@@ -186,8 +202,16 @@ export default function Registration({ mode, onClose, onSuccess }) {
 
   const handleResend = async () => {
     if (resendIn > 0 || loading) return
-    setLoading(true)
     setError('')
+    // DEV-заглушка: SMS не шлём, просто перезапускаем таймер и подставляем тестовый код.
+    if (DEV_STUB_OTP) {
+      setResendIn(RESEND_SECONDS)
+      setCode(STUB_OTP_CODE.padEnd(CODE_LENGTH, '').slice(0, CODE_LENGTH).split(''))
+      setJustResent(true)
+      setTimeout(() => setJustResent(false), 2400)
+      return
+    }
+    setLoading(true)
     try {
       await requestOtp(phone)
       setResendIn(RESEND_SECONDS)
@@ -349,6 +373,9 @@ export default function Registration({ mode, onClose, onSuccess }) {
                   <p className="reg-sub">
                     Код отправлен на <span className="reg-phone">{phone}</span>
                   </p>
+                  {DEV_STUB_OTP && (
+                    <p className="reg-info">Тестовый режим: SMS отключены, код — {STUB_OTP_CODE}</p>
+                  )}
 
                   <form onSubmit={handleVerify} className="reg-form">
                     <div className="reg-code-row">
