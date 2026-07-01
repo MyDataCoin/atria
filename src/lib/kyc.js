@@ -59,3 +59,22 @@ export async function getKycStatus() {
 export function isKycApproved(profile) {
   return profile?.status === KycStatus.Approved
 }
+
+/** Валидный ли адрес кошелька: 0x + 40 hex (как ждёт бэкенд для аллокации токенов). */
+export function isValidWallet(address) {
+  return /^0x[0-9a-fA-F]{40}$/.test(String(address || '').trim())
+}
+
+/**
+ * Привязать криптокошелёк к KYC-профилю инвестора (для аллокации токенов).
+ * ВНИМАНИЕ: на момент написания в API нет отдельной ручки — walletAddress принимается
+ * только в POST /kyc/submit. Бэкенду нужно добавить эндпоинт (напр. PATCH /kyc/wallet).
+ * Путь ниже — предполагаемый; подтвердить/поправить, когда бэкенд его реализует.
+ */
+export function attachWallet(walletAddress) {
+  return apiFetch('/kyc/wallet', {
+    method: 'PATCH',
+    auth: true,
+    body: { walletAddress: String(walletAddress).trim() },
+  })
+}

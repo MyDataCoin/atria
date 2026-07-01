@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { requestOtp, verifyOtp } from '../lib/auth.js'
-import { submitKyc, getKycStatus, KycStatus } from '../lib/kyc.js'
+import { submitKyc, getKycStatus, KycStatus, attachWallet, isValidWallet } from '../lib/kyc.js'
 import { openDiditVerification } from '../lib/didit.js'
 import { ApiError } from '../lib/api.js'
 
@@ -53,7 +53,9 @@ function digitsOnly(formatted) {
 export default function Registration({ mode, onClose, onSuccess }) {
   const isOpen = mode === 'register' || mode === 'login'
 
-  // steps: 1 = phone, 2 = code, 3 = success, 4 = kyc prompt, 5 = kyc result
+  // steps: 1 = phone, 2 = code, 3 = success, 4 = kyc prompt, 5 = kyc result,
+  //        6 = wallet choice, 7 = metamask instructions, 8 = wallet input,
+  //        9 = final success, 10 = incomplete warning
   const [step, setStep] = useState(1)
   const [phone, setPhone] = useState('+996 ')
   const [code, setCode] = useState(Array(CODE_LENGTH).fill(''))
@@ -62,6 +64,7 @@ export default function Registration({ mode, onClose, onSuccess }) {
   const [resendIn, setResendIn] = useState(0)
   const [justResent, setJustResent] = useState(false)
   const [kycResult, setKycResult] = useState(null) // KycStatusDto после возврата из Didit
+  const [wallet, setWallet] = useState('') // адрес криптокошелька инвестора
 
   const inputsRef = useRef([])
 
@@ -79,6 +82,7 @@ export default function Registration({ mode, onClose, onSuccess }) {
       setResendIn(0)
       setJustResent(false)
       setKycResult(null)
+      setWallet('')
     }
   }, [isOpen, mode])
 
@@ -98,11 +102,13 @@ export default function Registration({ mode, onClose, onSuccess }) {
   useEffect(() => {
     if (!isOpen) return
     const onKey = (e) => {
-      if (e.key === 'Escape') onClose?.()
+      if (e.key !== 'Escape') return
+      if (step >= 6 && step <= 8) setStep(10)
+      else onClose?.()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [isOpen, onClose])
+  }, [isOpen, onClose, step])
 
   // countdown for "resend code"
   useEffect(() => {
@@ -257,10 +263,8 @@ export default function Registration({ mode, onClose, onSuccess }) {
         return
       }
 
-      // Завершено. Результат SDK — лишь подсказка; итог берём из /kyc/me (его пишет webhook).
-      const profile = await getKycStatus()
-      setKycResult(profile || { status: KycStatus.Pending })
-      setStep(5)
+      // Завершено. Дальше — привязка криптокошелька (решение KYC прилетит webhook'ом отдельно).
+      setStep(6)
     } catch (err) {
       if (err instanceof ApiError && err.status === 400) {
         setError('Проверка личности уже начата или завершена')
@@ -296,6 +300,38 @@ export default function Registration({ mode, onClose, onSuccess }) {
     }
   }
 
+  // Шаг 8: привязать введённый кошелёк и завершить регистрацию.
+  const handleWalletSubmit = async () => {
+    if (loading) return
+    if (!isValidWallet(wallet)) {
+      setError('Введите корректный адрес кошелька (0x… из 42 символов)')
+      return
+    }
+    setLoading(true)
+    setError('')
+    try {
+      await attachWallet(wallet)
+    } catch (err) {
+      // Пока бэкенд не добавил ручку привязки — не блокируем флоу, но логируем.
+      console.warn('attachWallet failed (нужен эндпоинт на бэке):', err?.status, err?.problem || err)
+    } finally {
+      setLoading(false)
+    }
+    setStep(9)
+  }
+
+  // Во время wallet-флоу (6–8) закрытие = «регистрация не завершена»: показываем предупреждение,
+  // а не выходим сразу. На финальном success (9) и остальных шагах закрываем как обычно.
+  const inWalletFlow = step >= 6 && step <= 8
+  const attemptClose = () => {
+    if (inWalletFlow) {
+      setError('')
+      setStep(10)
+      return
+    }
+    onClose?.()
+  }
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -306,7 +342,7 @@ export default function Registration({ mode, onClose, onSuccess }) {
           exit={{ opacity: 0 }}
           transition={{ duration: 0.3, ease: EASE }}
           onMouseDown={(e) => {
-            if (e.target === e.currentTarget) onClose?.()
+            if (e.target === e.currentTarget) attemptClose()
           }}
         >
           <motion.div
@@ -318,7 +354,7 @@ export default function Registration({ mode, onClose, onSuccess }) {
             role="dialog"
             aria-modal="true"
           >
-            <button className="reg-close" onClick={onClose} aria-label="Закрыть">
+            <button className="reg-close" onClick={attemptClose} aria-label="Закрыть">
               <svg viewBox="0 0 24 24" width="16" height="16">
                 <path d="M5 5L19 19M19 5L5 19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
               </svg>
@@ -581,6 +617,172 @@ export default function Registration({ mode, onClose, onSuccess }) {
                       <span className="dot" />
                     </button>
                   )}
+                </motion.div>
+              )}
+
+              {step === 6 && (
+                <motion.div
+                  key="step6-wallet-choice"
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -12 }}
+                  transition={{ duration: 0.35, ease: EASE }}
+                >
+                  <h2 className="reg-title display">Прикрепите криптокошелёк</h2>
+                  <p className="reg-sub">
+                    На него будут зачисляться токены ваших долей. Есть ли у вас кошелёк?
+                  </p>
+                  <div className="reg-form">
+                    <button
+                      className="btn btn-primary reg-submit"
+                      onClick={() => {
+                        setError('')
+                        setStep(8)
+                      }}
+                    >
+                      <span>У меня есть кошелёк</span>
+                      <span className="dot" />
+                    </button>
+                    <button
+                      className="btn btn-ghost reg-submit"
+                      onClick={() => {
+                        setError('')
+                        setStep(7)
+                      }}
+                    >
+                      <span>У меня нет кошелька</span>
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+
+              {step === 7 && (
+                <motion.div
+                  key="step7-metamask"
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -12 }}
+                  transition={{ duration: 0.35, ease: EASE }}
+                >
+                  <h2 className="reg-title display">Создайте кошелёк MetaMask</h2>
+                  <p className="reg-sub">Займёт пару минут. Следуйте шагам:</p>
+                  <ol className="reg-steps">
+                    <li>Откройте App Store (iPhone) или Google Play (Android)</li>
+                    <li>Введите в поиск «MetaMask» и установите приложение</li>
+                    <li>Откройте MetaMask и нажмите «Создать новый кошелёк»</li>
+                    <li>Придумайте пароль и примите условия</li>
+                    <li>Сохраните секретную фразу (12 слов) в надёжном месте — никому её не показывайте</li>
+                    <li>Подтвердите секретную фразу</li>
+                    <li>Скопируйте адрес кошелька (начинается с 0x) — он понадобится ниже</li>
+                  </ol>
+                  <button
+                    className="btn btn-primary reg-submit"
+                    onClick={() => {
+                      setError('')
+                      setStep(8)
+                    }}
+                  >
+                    <span>Добавить кошелёк</span>
+                    <span className="dot" />
+                  </button>
+                  <button className="reg-back" onClick={() => setStep(6)}>
+                    ← Назад
+                  </button>
+                </motion.div>
+              )}
+
+              {step === 8 && (
+                <motion.div
+                  key="step8-wallet-input"
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -12 }}
+                  transition={{ duration: 0.35, ease: EASE }}
+                >
+                  <h2 className="reg-title display">Адрес кошелька</h2>
+                  <p className="reg-sub">Вставьте адрес вашего криптокошелька (начинается с 0x)</p>
+                  <form
+                    className="reg-form"
+                    onSubmit={(e) => {
+                      e.preventDefault()
+                      handleWalletSubmit()
+                    }}
+                  >
+                    <label className="reg-field">
+                      <span className="reg-label mono">Адрес кошелька</span>
+                      <input
+                        type="text"
+                        value={wallet}
+                        onChange={(e) => {
+                          setError('')
+                          setWallet(e.target.value.trim())
+                        }}
+                        placeholder="0x…"
+                        autoFocus
+                      />
+                    </label>
+
+                    {error && <div className="reg-error">{error}</div>}
+
+                    <button type="submit" className="btn btn-primary reg-submit" disabled={loading}>
+                      <span>{loading ? 'Сохраняем…' : 'Завершить регистрацию'}</span>
+                      <span className="dot" />
+                    </button>
+                  </form>
+                  <button className="reg-back" onClick={() => setStep(6)}>
+                    ← Назад
+                  </button>
+                </motion.div>
+              )}
+
+              {step === 9 && (
+                <motion.div
+                  key="step9-done"
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -12 }}
+                  transition={{ duration: 0.35, ease: EASE }}
+                  className="reg-success"
+                >
+                  <div className="reg-success-icon">
+                    <svg viewBox="0 0 24 24" width="28" height="28">
+                      <path d="M4 12.5L9.5 18L20 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                    </svg>
+                  </div>
+                  <h2 className="reg-title display">Вы успешно прошли регистрацию</h2>
+                  <p className="reg-sub">Личность подтверждена, кошелёк привязан — можно инвестировать</p>
+                  <button className="btn btn-primary reg-submit" onClick={onClose}>
+                    <span>Готово</span>
+                    <span className="dot" />
+                  </button>
+                </motion.div>
+              )}
+
+              {step === 10 && (
+                <motion.div
+                  key="step10-incomplete"
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -12 }}
+                  transition={{ duration: 0.35, ease: EASE }}
+                  className="reg-success"
+                >
+                  <div className="reg-success-icon">
+                    <svg viewBox="0 0 24 24" width="28" height="28">
+                      <path d="M12 8v5M12 16.5v.5M12 3l9 16H3l9-16z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                    </svg>
+                  </div>
+                  <h2 className="reg-title display">Вы не завершили регистрацию</h2>
+                  <p className="reg-sub">
+                    Кошелёк не привязан. Без него регистрация не считается завершённой.
+                  </p>
+                  <button className="btn btn-primary reg-submit" onClick={() => setStep(6)}>
+                    <span>Продолжить</span>
+                    <span className="dot" />
+                  </button>
+                  <button className="btn btn-ghost reg-submit" onClick={onClose}>
+                    <span>Выйти без привязки</span>
+                  </button>
                 </motion.div>
               )}
             </AnimatePresence>

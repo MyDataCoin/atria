@@ -3086,6 +3086,20 @@ body::after {
   border-radius: 8px;
   padding: 0.6em 0.9em;
 }
+.reg-steps {
+  margin: 0.4rem 0 1rem;
+  padding-left: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  color: var(--ink-2, inherit);
+  text-align: left;
+}
+.reg-steps li {
+  padding-left: 0.2rem;
+}
 .reg-submit {
   width: 100%;
   justify-content: center;
