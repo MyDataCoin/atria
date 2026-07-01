@@ -267,7 +267,14 @@ export default function Registration({ mode, onClose, onSuccess }) {
       setStep(6)
     } catch (err) {
       if (err instanceof ApiError && err.status === 400) {
-        setError('Проверка личности уже начата или завершена')
+        // KYC уже пройден/начат для этого юзера — сама верификация повторно не нужна.
+        // Если профиль существует, ведём сразу на привязку кошелька (шаг 6).
+        const profile = await getKycStatus().catch(() => null)
+        if (profile) {
+          setStep(6)
+        } else {
+          setError('Проверка личности уже начата или завершена')
+        }
       } else if (err instanceof ApiError && err.status === 401) {
         setError('Нужна авторизация: сначала войдите по номеру телефона')
       } else if (err instanceof ApiError && err.status >= 500) {
