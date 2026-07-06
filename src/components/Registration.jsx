@@ -3,7 +3,10 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { requestOtp, verifyOtp } from '../lib/auth.js'
 import { submitKyc, getKycStatus, KycStatus, attachWallet, isValidWallet } from '../lib/kyc.js'
 import { openDiditVerification } from '../lib/didit.js'
+import { postConsent } from '../lib/consent.js'
 import { ApiError, tokens } from '../lib/api.js'
+import DocModal from './DocModal.jsx'
+import { CONSENT_FORM } from '../content.consent.js'
 
 const EASE = [0.16, 1, 0.3, 1]
 const CODE_LENGTH = 6
@@ -64,6 +67,8 @@ export default function Registration({ mode, onClose, onSuccess }) {
   const [resendIn, setResendIn] = useState(0)
   const [justResent, setJustResent] = useState(false)
   const [wallet, setWallet] = useState('') // адрес криптокошелька инвестора
+  const [consent, setConsent] = useState(false) // согласие на обработку ПДн (по умолчанию снято)
+  const [showConsentDoc, setShowConsentDoc] = useState(false) // открыт ли текст согласия
 
   const inputsRef = useRef([])
 
@@ -80,6 +85,8 @@ export default function Registration({ mode, onClose, onSuccess }) {
       setResendIn(0)
       setJustResent(false)
       setWallet('')
+      setConsent(false)
+      setShowConsentDoc(false)
 
       // Куда открывать модалку:
       // • не авторизован → телефон (шаг 1);
@@ -255,9 +262,21 @@ export default function Registration({ mode, onClose, onSuccess }) {
   // Бэкенд (POST /kyc/submit) сам ходит в Didit с секретами и отдаёт нам verificationUrl.
   const handleStartKyc = async () => {
     if (loading) return
+    // Без согласия на обработку ПДн KYC не начинаем (кнопка и так заблокирована — двойная защита).
+    if (!consent) {
+      setError('Отметьте согласие на обработку персональных данных')
+      return
+    }
     setLoading(true)
     setError('')
     try {
+      // Сначала фиксируем согласие (кто/когда/версия), потом отправляем ПДн в обработку.
+      // Ручки /consent на бэке пока нет — не блокируем флоу, но логируем (бэкенд должен её добавить и enforce'ить).
+      try {
+        await postConsent()
+      } catch (e) {
+        console.warn('postConsent failed (нужен эндпоинт /consent на бэке):', e?.status, e?.problem || e)
+      }
       const { verificationUrl } = await submitKyc()
       if (!verificationUrl) {
         setError('Не удалось получить ссылку верификации. Попробуйте позже')
@@ -345,6 +364,7 @@ export default function Registration({ mode, onClose, onSuccess }) {
   }
 
   return (
+    <>
     <AnimatePresence>
       {isOpen && (
         <motion.div
@@ -553,11 +573,33 @@ export default function Registration({ mode, onClose, onSuccess }) {
                   <p className="reg-sub">
                     Для начала работы с нами подтвердите личность — это займёт несколько минут
                   </p>
+
+                  <label className="reg-consent">
+                    <input
+                      type="checkbox"
+                      checked={consent}
+                      onChange={(e) => {
+                        setError('')
+                        setConsent(e.target.checked)
+                      }}
+                    />
+                    <span>
+                      Я даю согласие на{' '}
+                      <button
+                        type="button"
+                        className="reg-consent-link"
+                        onClick={() => setShowConsentDoc(true)}
+                      >
+                        обработку персональных данных
+                      </button>
+                    </span>
+                  </label>
+
                   {error && <div className="reg-error">{error}</div>}
                   <button
                     className="btn btn-primary reg-submit"
                     onClick={handleStartKyc}
-                    disabled={loading}
+                    disabled={loading || !consent}
                   >
                     <span>{loading ? 'Открываем проверку…' : 'Начать'}</span>
                     <span className="dot" />
@@ -762,5 +804,9 @@ export default function Registration({ mode, onClose, onSuccess }) {
         </motion.div>
       )}
     </AnimatePresence>
+
+    {/* Текст согласия на обработку ПДн — версионированный (см. content.consent.js). */}
+    <DocModal doc={showConsentDoc ? CONSENT_FORM : null} onClose={() => setShowConsentDoc(false)} />
+    </>
   )
 }

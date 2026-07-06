@@ -3086,6 +3086,30 @@ body::after {
   border-radius: 8px;
   padding: 0.6em 0.9em;
 }
+.reg-consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  margin: 0.4rem 0 0.9rem;
+  font-size: 0.86rem;
+  line-height: 1.4;
+  text-align: left;
+  cursor: pointer;
+}
+.reg-consent input[type='checkbox'] {
+  margin-top: 0.15rem;
+  width: 1.05rem;
+  height: 1.05rem;
+  flex: 0 0 auto;
+  accent-color: var(--amber-deep, var(--amber));
+  cursor: pointer;
+}
+.reg-consent-link {
+  color: var(--amber-deep, var(--amber));
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
 .reg-steps {
   margin: 0.4rem 0 1rem;
   padding-left: 1.2rem;
