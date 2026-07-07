@@ -4,6 +4,7 @@ import { useContent } from '../i18n.jsx'
 import { PRIVACY_POLICY } from '../content.policy.js'
 import { CONSENT_FORM } from '../content.consent.js'
 import { TERMS_OF_SERVICE } from '../content.tos.js'
+import { WHITE_PAPER } from '../content.whitepaper.js'
 import DocModal from './DocModal.jsx'
 
 const EASE = [0.16, 1, 0.3, 1]
@@ -86,6 +87,7 @@ export default function Footer() {
     ...companyLinks,
     { label: 'Лицензия №1', licenseId: 1 },
     { label: 'Лицензия №2', licenseId: 2 },
+    { label: 'White Paper', doc: WHITE_PAPER },
     { label: 'Пользовательское соглашение', doc: TERMS_OF_SERVICE },
     { label: 'Политика конфиденциальности', doc: PRIVACY_POLICY },
     { label: 'Согласие на обработку данных', doc: CONSENT_FORM },
