@@ -34,9 +34,11 @@ function fromApi(dto, i, ui, filters) {
   const available = Number(dto.availableTokens ?? total) || 0
   const bought = total > 0 ? Math.round(((total - available) / total) * 100) : 0
 
+  // Статус объекта по полю status бэкенда: draft → скоро, completed → распродан,
+  // open → открыт к покупке (но если токенов не осталось — тоже распродан).
   let statusKey = 'open'
-  if (dto.isActive === false) statusKey = 'soon'
-  else if (available <= 0) statusKey = 'sold'
+  if (dto.status === 'draft') statusKey = 'soon'
+  else if (dto.status === 'completed' || available <= 0) statusKey = 'sold'
 
   const currency = dto.currency || ''
   return {
