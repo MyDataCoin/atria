@@ -22,21 +22,29 @@ const pick = (obj, keys) => {
 export default function DetailsModal({ property, onClose }) {
   const isOpen = Boolean(property)
   const [imgIndex, setImgIndex] = useState(0)
+  const [zoomed, setZoomed] = useState(false) // открыт ли лайтбокс с увеличенным фото
 
   useEffect(() => {
-    if (isOpen) setImgIndex(0)
+    if (isOpen) {
+      setImgIndex(0)
+      setZoomed(false)
+    }
   }, [isOpen, property?.id])
 
   useEffect(() => {
     if (!isOpen) return
     document.body.style.overflow = 'hidden'
-    const onKey = (e) => e.key === 'Escape' && onClose?.()
+    const onKey = (e) => {
+      if (e.key !== 'Escape') return
+      if (zoomed) setZoomed(false)
+      else onClose?.()
+    }
     window.addEventListener('keydown', onKey)
     return () => {
       document.body.style.overflow = ''
       window.removeEventListener('keydown', onKey)
     }
-  }, [isOpen, onClose])
+  }, [isOpen, onClose, zoomed])
 
   const data = useMemo(() => {
     if (!property) return null
@@ -83,10 +91,12 @@ export default function DetailsModal({ property, onClose }) {
   ].filter(([, v]) => v != null)
 
   return (
+    <>
     <AnimatePresence>
       {isOpen && (
         <motion.div
           className="reg-overlay"
+          data-lenis-prevent
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -97,6 +107,7 @@ export default function DetailsModal({ property, onClose }) {
         >
           <motion.div
             className="reg-card details-card"
+            data-lenis-prevent
             initial={{ opacity: 0, y: 24, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 16, scale: 0.97 }}
@@ -113,13 +124,22 @@ export default function DetailsModal({ property, onClose }) {
             <span className="eyebrow">Об объекте</span>
             <h2 className="reg-title display details-title">{property.name}</h2>
 
-            {/* Галерея фото объекта (может быть несколько). Если фото нет — карта. */}
-            {data.images.length > 0 ? (
+            {/* Галерея фото объекта (может быть несколько). Клик по фото — увеличить. */}
+            {data.images.length > 0 && (
               <div className="details-gallery">
-                <div
+                <button
+                  type="button"
                   className="details-gallery-main"
                   style={{ backgroundImage: `url(${data.images[imgIndex]?.url})` }}
-                />
+                  onClick={() => setZoomed(true)}
+                  aria-label="Увеличить фото"
+                >
+                  <span className="details-zoom-hint" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" width="16" height="16">
+                      <path d="M11 8v6M8 11h6M10 17a7 7 0 1 1 0-14 7 7 0 0 1 0 14zM20 20l-4.5-4.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" fill="none" />
+                    </svg>
+                  </span>
+                </button>
                 {data.images.length > 1 && (
                   <div className="details-thumbs">
                     {data.images.map((img, i) => (
@@ -135,16 +155,17 @@ export default function DetailsModal({ property, onClose }) {
                   </div>
                 )}
               </div>
-            ) : (
-              <div className="details-map">
-                <iframe
-                  title={`Карта: ${property.name}`}
-                  src={mapSrc}
-                  loading="lazy"
-                  referrerPolicy="no-referrer-when-downgrade"
-                />
-              </div>
             )}
+
+            {/* Карта по адресу — оставляем всегда. */}
+            <div className="details-map">
+              <iframe
+                title={`Карта: ${property.name}`}
+                src={mapSrc}
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+              />
+            </div>
 
             {data.salesPaused && (
               <div className="details-paused">Выпуск временно приостановлен</div>
@@ -157,28 +178,16 @@ export default function DetailsModal({ property, onClose }) {
               </div>
             )}
 
-            <div className="details-rows">
-              <div className="details-row">
-                <span className="details-row-label">Цена за токен</span>
-                <span className="details-row-value">
-                  {fmt(data.tokenPrice)} {data.currency}
-                </span>
+            {rows.length > 0 && (
+              <div className="details-rows">
+                {rows.map(([label, value]) => (
+                  <div className="details-row" key={label}>
+                    <span className="details-row-label">{label}</span>
+                    <span className="details-row-value">{value}</span>
+                  </div>
+                ))}
               </div>
-              <div className="details-row">
-                <span className="details-row-label">Всего токенов</span>
-                <span className="details-row-value">{fmt(data.total)}</span>
-              </div>
-              <div className="details-row">
-                <span className="details-row-label">Доступно</span>
-                <span className="details-row-value">{fmt(data.available)}</span>
-              </div>
-              {rows.map(([label, value]) => (
-                <div className="details-row" key={label}>
-                  <span className="details-row-label">{label}</span>
-                  <span className="details-row-value">{value}</span>
-                </div>
-              ))}
-            </div>
+            )}
 
             {data.documents.length > 0 && (
               <div className="details-section">
@@ -206,5 +215,24 @@ export default function DetailsModal({ property, onClose }) {
         </motion.div>
       )}
     </AnimatePresence>
+
+    {/* Лайтбокс: увеличенное фото поверх модалки. Клик — закрыть. */}
+    {zoomed && data.images.length > 0 && (
+      <div
+        className="details-lightbox"
+        data-lenis-prevent
+        onClick={() => setZoomed(false)}
+        role="dialog"
+        aria-modal="true"
+      >
+        <button className="details-lightbox-close" aria-label="Закрыть" onClick={() => setZoomed(false)}>
+          <svg viewBox="0 0 24 24" width="20" height="20">
+            <path d="M5 5L19 19M19 5L5 19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+        </button>
+        <img src={data.images[imgIndex]?.url} alt={property.name} />
+      </div>
+    )}
+    </>
   )
 }
