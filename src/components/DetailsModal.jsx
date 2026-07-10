@@ -217,7 +217,11 @@ export default function DetailsModal({ property, onClose }) {
                       target="_blank"
                       rel="noopener noreferrer"
                     >
-                      {doc.fileName || `Документ ${i + 1}`}
+                      <svg className="details-doc-icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                        <path d="M14 3H7a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7l-4-4zM14 3v4h4M9 13h6M9 17h6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                      </svg>
+                      <span className="details-doc-name">{doc.fileName || `Документ ${i + 1}`}</span>
+                      <span className="details-doc-open" aria-hidden="true">Открыть ↗</span>
                     </a>
                   ))}
                 </div>

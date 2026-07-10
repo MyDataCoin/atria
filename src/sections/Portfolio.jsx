@@ -58,6 +58,7 @@ function fromApi(dto, i, ui, filters) {
     statusKey,
     status: statusLabel(filters, statusKey),
     salesPaused: dto.salesPaused === true, // продажи временно приостановлены (кнопка «Купить» блокируется)
+    img: dto.images?.[0]?.url || undefined, // первая фотка — обложка карточки (иначе градиент)
     details: [],
     raw: dto, // полный объект для модалки покупки
   }
