@@ -89,7 +89,10 @@ function fromStatic(p, ui) {
 function PCard({ p, i, ui, onBuy, onDetails }) {
   const [open, setOpen] = useState(false)
   const hasDetails = p.details && p.details.length > 0
-  const canBuy = p.raw && p.statusKey !== 'sold'
+  // «Скоро» ещё нельзя купить — показываем только описание и «Подробнее»,
+  // без токенов/цен/прогресса и без кнопки «Купить».
+  const isSoon = p.statusKey === 'soon'
+  const canBuy = p.raw && p.statusKey !== 'sold' && !isSoon
   return (
     <Reveal as="article" className="pcard" delay={i * 0.08} y={28} amount={0.15}>
       <div
@@ -99,44 +102,48 @@ function PCard({ p, i, ui, onBuy, onDetails }) {
         <span className={`pcard-badge ${p.statusKey}`}>{p.status}</span>
       </div>
       <div className="pcard-body">
-        {p.loc && <span className="loc">{p.loc}</span>}
+        {!isSoon && p.loc && <span className="loc">{p.loc}</span>}
         <h3>{p.name}</h3>
         {p.type && <span className="ptype">{p.type}</span>}
 
-        <div className="pcard-metrics">
-          {p.metrics.map((m) => (
-            <div key={m.k}>
-              <span className="mk">{m.k}</span>
-              <span className="mv">
-                {m.unit && typeof m.v === 'string' ? (
-                  <>
-                    <span className="u">{m.v[0]}</span>
-                    {m.v.slice(1)}
-                  </>
-                ) : (
-                  m.v
-                )}
-              </span>
+        {!isSoon && (
+          <>
+            <div className="pcard-metrics">
+              {p.metrics.map((m) => (
+                <div key={m.k}>
+                  <span className="mk">{m.k}</span>
+                  <span className="mv">
+                    {m.unit && typeof m.v === 'string' ? (
+                      <>
+                        <span className="u">{m.v[0]}</span>
+                        {m.v.slice(1)}
+                      </>
+                    ) : (
+                      m.v
+                    )}
+                  </span>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
 
-        <div className="pbar-head">
-          <span>
-            {ui.bought} {p.bought}%
-          </span>
-          <span>{p.statusKey === 'sold' ? ui.soldOut : ui.selling}</span>
-        </div>
-        <div className="pbar">
-          <motion.i
-            className={p.bought >= 100 ? 'full' : ''}
-            initial={{ scaleX: 0 }}
-            whileInView={{ scaleX: p.bought / 100 }}
-            viewport={{ once: true, amount: 0.6 }}
-            transition={{ duration: 1, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
-            style={{ transformOrigin: 'left' }}
-          />
-        </div>
+            <div className="pbar-head">
+              <span>
+                {ui.bought} {p.bought}%
+              </span>
+              <span>{p.statusKey === 'sold' ? ui.soldOut : ui.selling}</span>
+            </div>
+            <div className="pbar">
+              <motion.i
+                className={p.bought >= 100 ? 'full' : ''}
+                initial={{ scaleX: 0 }}
+                whileInView={{ scaleX: p.bought / 100 }}
+                viewport={{ once: true, amount: 0.6 }}
+                transition={{ duration: 1, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
+                style={{ transformOrigin: 'left' }}
+              />
+            </div>
+          </>
+        )}
 
         {hasDetails && (
           <>
