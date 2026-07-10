@@ -34,10 +34,11 @@ function fromApi(dto, i, ui, filters) {
   const available = Number(dto.availableTokens ?? total) || 0
   const bought = total > 0 ? Math.round(((total - available) / total) * 100) : 0
 
-  // Статус объекта по полю status бэкенда: draft → скоро, completed → распродан,
+  // Статус объекта по полю status бэкенда: coming_soon → скоро, completed → распродан,
   // open → открыт к покупке (но если токенов не осталось — тоже распродан).
+  // draft на сайт не попадает (фильтруется до маппинга — виден только админам).
   let statusKey = 'open'
-  if (dto.status === 'draft') statusKey = 'soon'
+  if (dto.status === 'coming_soon') statusKey = 'soon'
   else if (dto.status === 'completed' || available <= 0) statusKey = 'sold'
 
   const currency = dto.currency || ''
@@ -218,7 +219,8 @@ export default function Portfolio() {
     listProperties()
       .then((data) => {
         if (!alive) return
-        const list = Array.isArray(data) ? data : []
+        // draft — черновики, видны только в админке; на сайт не показываем.
+        const list = (Array.isArray(data) ? data : []).filter((dto) => dto.status !== 'draft')
         setState({
           status: 'ready',
           cards: list.map((dto, i) => fromApi(dto, i, ui, filters)),
