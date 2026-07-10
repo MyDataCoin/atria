@@ -90,6 +90,9 @@ export default function DetailsModal({ property, onClose }) {
     ['Адрес', data.address],
   ].filter(([, v]) => v != null)
 
+  const imgCount = data.images.length
+  const goImg = (dir) => setImgIndex((i) => (i + dir + imgCount) % imgCount)
+
   return (
     <>
     <AnimatePresence>
@@ -124,23 +127,46 @@ export default function DetailsModal({ property, onClose }) {
             <span className="eyebrow">Об объекте</span>
             <h2 className="reg-title display details-title">{property.name}</h2>
 
-            {/* Галерея фото объекта (может быть несколько). Клик по фото — увеличить. */}
-            {data.images.length > 0 && (
+            {/* Галерея фото объекта: стрелки, счётчик, клик — увеличить. */}
+            {imgCount > 0 && (
               <div className="details-gallery">
-                <button
-                  type="button"
-                  className="details-gallery-main"
-                  style={{ backgroundImage: `url(${data.images[imgIndex]?.url})` }}
-                  onClick={() => setZoomed(true)}
-                  aria-label="Увеличить фото"
-                >
-                  <span className="details-zoom-hint" aria-hidden="true">
-                    <svg viewBox="0 0 24 24" width="16" height="16">
-                      <path d="M11 8v6M8 11h6M10 17a7 7 0 1 1 0-14 7 7 0 0 1 0 14zM20 20l-4.5-4.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" fill="none" />
-                    </svg>
-                  </span>
-                </button>
-                {data.images.length > 1 && (
+                <div className="details-gallery-frame">
+                  <button
+                    type="button"
+                    className="details-gallery-main"
+                    style={{ backgroundImage: `url(${data.images[imgIndex]?.url})` }}
+                    onClick={() => setZoomed(true)}
+                    aria-label="Увеличить фото"
+                  >
+                    <span className="details-zoom-hint" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" width="16" height="16">
+                        <path d="M11 8v6M8 11h6M10 17a7 7 0 1 1 0-14 7 7 0 0 1 0 14zM20 20l-4.5-4.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" fill="none" />
+                      </svg>
+                    </span>
+                  </button>
+                  {imgCount > 1 && (
+                    <>
+                      <button
+                        type="button"
+                        className="details-nav prev"
+                        onClick={() => goImg(-1)}
+                        aria-label="Предыдущее фото"
+                      >
+                        <svg viewBox="0 0 24 24" width="20" height="20"><path d="M15 5l-7 7 7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" /></svg>
+                      </button>
+                      <button
+                        type="button"
+                        className="details-nav next"
+                        onClick={() => goImg(1)}
+                        aria-label="Следующее фото"
+                      >
+                        <svg viewBox="0 0 24 24" width="20" height="20"><path d="M9 5l7 7-7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" /></svg>
+                      </button>
+                      <span className="details-counter">{imgIndex + 1} / {imgCount}</span>
+                    </>
+                  )}
+                </div>
+                {imgCount > 1 && (
                   <div className="details-thumbs">
                     {data.images.map((img, i) => (
                       <button
@@ -156,16 +182,6 @@ export default function DetailsModal({ property, onClose }) {
                 )}
               </div>
             )}
-
-            {/* Карта по адресу — оставляем всегда. */}
-            <div className="details-map">
-              <iframe
-                title={`Карта: ${property.name}`}
-                src={mapSrc}
-                loading="lazy"
-                referrerPolicy="no-referrer-when-downgrade"
-              />
-            </div>
 
             {data.salesPaused && (
               <div className="details-paused">Выпуск временно приостановлен</div>
@@ -208,6 +224,19 @@ export default function DetailsModal({ property, onClose }) {
               </div>
             )}
 
+            {/* Карта по адресу — в самом низу. */}
+            <div className="details-section">
+              <h4>На карте</h4>
+              <div className="details-map">
+                <iframe
+                  title={`Карта: ${property.name}`}
+                  src={mapSrc}
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                />
+              </div>
+            </div>
+
             <button className="btn btn-ghost details-close-btn" onClick={onClose}>
               <span>Закрыть</span>
             </button>
@@ -216,8 +245,8 @@ export default function DetailsModal({ property, onClose }) {
       )}
     </AnimatePresence>
 
-    {/* Лайтбокс: увеличенное фото поверх модалки. Клик — закрыть. */}
-    {zoomed && data.images.length > 0 && (
+    {/* Лайтбокс: увеличенное фото поверх модалки. Клик по фону — закрыть. */}
+    {zoomed && imgCount > 0 && (
       <div
         className="details-lightbox"
         data-lenis-prevent
@@ -230,7 +259,26 @@ export default function DetailsModal({ property, onClose }) {
             <path d="M5 5L19 19M19 5L5 19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
           </svg>
         </button>
-        <img src={data.images[imgIndex]?.url} alt={property.name} />
+        {imgCount > 1 && (
+          <>
+            <button
+              className="details-nav prev lb"
+              aria-label="Предыдущее фото"
+              onClick={(e) => { e.stopPropagation(); goImg(-1) }}
+            >
+              <svg viewBox="0 0 24 24" width="26" height="26"><path d="M15 5l-7 7 7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" /></svg>
+            </button>
+            <button
+              className="details-nav next lb"
+              aria-label="Следующее фото"
+              onClick={(e) => { e.stopPropagation(); goImg(1) }}
+            >
+              <svg viewBox="0 0 24 24" width="26" height="26"><path d="M9 5l7 7-7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" /></svg>
+            </button>
+            <span className="details-counter lb">{imgIndex + 1} / {imgCount}</span>
+          </>
+        )}
+        <img src={data.images[imgIndex]?.url} alt={property.name} onClick={(e) => e.stopPropagation()} />
       </div>
     )}
     </>

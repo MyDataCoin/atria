@@ -3698,20 +3698,30 @@ body::after {
 .details-gallery {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.6rem;
+}
+.details-gallery-frame {
+  position: relative;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-card);
 }
 .details-gallery-main {
   position: relative;
   display: block;
   width: 100%;
-  height: 260px;
+  height: clamp(220px, 42vh, 320px);
   padding: 0;
-  border-radius: 14px;
-  border: 1px solid var(--line);
+  border: 0;
   background-size: cover;
   background-position: center;
   background-color: var(--bone);
   cursor: zoom-in;
+  transition: transform 0.5s var(--ease);
+}
+.details-gallery-frame:hover .details-gallery-main {
+  transform: scale(1.02);
 }
 .details-zoom-hint {
   position: absolute;
@@ -3720,12 +3730,76 @@ body::after {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
   color: #fff;
   background: color-mix(in srgb, #000 45%, transparent);
   backdrop-filter: blur(4px);
+  opacity: 0;
+  transition: opacity 0.3s var(--ease);
+}
+.details-gallery-frame:hover .details-zoom-hint {
+  opacity: 1;
+}
+
+/* Стрелки навигации по фото (и в галерее, и в лайтбоксе) */
+.details-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  color: #fff;
+  background: color-mix(in srgb, #000 40%, transparent);
+  backdrop-filter: blur(4px);
+  cursor: pointer;
+  transition: background 0.25s var(--ease);
+  z-index: 2;
+}
+.details-nav:hover {
+  background: color-mix(in srgb, #000 62%, transparent);
+}
+.details-nav.prev {
+  left: 0.6rem;
+}
+.details-nav.next {
+  right: 0.6rem;
+}
+.details-nav.lb {
+  width: 52px;
+  height: 52px;
+}
+.details-nav.lb.prev {
+  left: clamp(0.5rem, 3vw, 2rem);
+}
+.details-nav.lb.next {
+  right: clamp(0.5rem, 3vw, 2rem);
+}
+/* Счётчик фото */
+.details-counter {
+  position: absolute;
+  bottom: 0.7rem;
+  left: 0.7rem;
+  padding: 0.25em 0.6em;
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  color: #fff;
+  background: color-mix(in srgb, #000 45%, transparent);
+  backdrop-filter: blur(4px);
+}
+.details-counter.lb {
+  position: fixed;
+  bottom: 1.4rem;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.82rem;
 }
 
 /* Лайтбокс увеличенного фото */
