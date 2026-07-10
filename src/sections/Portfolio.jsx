@@ -198,7 +198,7 @@ function PCard({ p, i, ui, onBuy, onDetails }) {
                 onClick={() => onBuy(p.raw)}
                 disabled={p.salesPaused}
               >
-                <span>{p.salesPaused ? 'Продажи на паузе' : ui.buy || 'Купить'}</span>
+                <span>{p.salesPaused ? 'Выпуск на паузе' : ui.buy || 'Купить'}</span>
                 <span className="dot" />
               </button>
             )}
@@ -206,7 +206,7 @@ function PCard({ p, i, ui, onBuy, onDetails }) {
         )}
 
         {canBuy && p.salesPaused && (
-          <p className="pcard-paused">Продажи временно приостановлены</p>
+          <p className="pcard-paused">Выпуск временно приостановлен</p>
         )}
       </div>
     </Reveal>

@@ -3693,6 +3693,73 @@ body::after {
   background: var(--bone);
   line-height: 0;
 }
+
+/* Галерея фото объекта */
+.details-gallery {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.details-gallery-main {
+  width: 100%;
+  height: 260px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background-size: cover;
+  background-position: center;
+  background-color: var(--bone);
+}
+.details-thumbs {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+}
+.details-thumb {
+  flex: 0 0 auto;
+  width: 68px;
+  height: 52px;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-size: cover;
+  background-position: center;
+  background-color: var(--bone);
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 0.2s, border-color 0.2s;
+}
+.details-thumb.on,
+.details-thumb:hover {
+  opacity: 1;
+  border-color: var(--amber-deep, var(--amber));
+}
+
+/* Пометка «выпуск на паузе» */
+.details-paused {
+  margin-top: 0.9rem;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-align: center;
+  color: var(--amber-deep, var(--amber));
+  background: color-mix(in srgb, var(--amber) 12%, transparent);
+  border-radius: 8px;
+  padding: 0.6em 0.9em;
+}
+
+/* Список документов объекта */
+.details-docs {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.details-doc {
+  font-size: 0.88rem;
+  color: var(--amber-deep, var(--amber));
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  word-break: break-word;
+}
 .details-map iframe {
   display: block;
   width: 100%;
