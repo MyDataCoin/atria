@@ -3471,6 +3471,20 @@ body::after {
   justify-content: center;
   padding-inline: 0.9rem;
 }
+.pcard-actions .btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+  pointer-events: none;
+}
+.pcard-paused {
+  margin-top: 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-3, #8a8a8a);
+  text-align: center;
+}
 
 /* ---- Модалка покупки доли (RWA) ---- */
 .buy-card {

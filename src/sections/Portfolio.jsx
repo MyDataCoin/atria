@@ -57,6 +57,7 @@ function fromApi(dto, i, ui, filters) {
     bought,
     statusKey,
     status: statusLabel(filters, statusKey),
+    salesPaused: dto.salesPaused === true, // продажи временно приостановлены (кнопка «Купить» блокируется)
     details: [],
     raw: dto, // полный объект для модалки покупки
   }
@@ -192,12 +193,20 @@ function PCard({ p, i, ui, onBuy, onDetails }) {
               <span>{ui.more || 'Подробнее'}</span>
             </button>
             {canBuy && (
-              <button className="btn btn-primary" onClick={() => onBuy(p.raw)}>
-                <span>{ui.buy || 'Купить'}</span>
+              <button
+                className="btn btn-primary"
+                onClick={() => onBuy(p.raw)}
+                disabled={p.salesPaused}
+              >
+                <span>{p.salesPaused ? 'Продажи на паузе' : ui.buy || 'Купить'}</span>
                 <span className="dot" />
               </button>
             )}
           </div>
+        )}
+
+        {canBuy && p.salesPaused && (
+          <p className="pcard-paused">Продажи временно приостановлены</p>
         )}
       </div>
     </Reveal>
