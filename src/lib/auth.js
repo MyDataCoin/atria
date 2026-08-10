@@ -12,12 +12,21 @@ export function toApiPhone(input) {
   return `996${digits}`
 }
 
-/** Шаг 1: запросить SMS-код. Возвращает null (204). */
+/**
+ * Шаг 1: запросить SMS-код.
+ *
+ * ВРЕМЕННО ОТКЛЮЧЕНО: SMS-шлюз дёргать нельзя ни при каких условиях. Функция ничего
+ * не запрашивает у бэкенда — на UI работает фиксированный код 111111 (см. Registration.jsx).
+ * Оставлена как no-op, чтобы даже случайный вызов не ушёл на /request-otp.
+ * Чтобы вернуть реальную отправку — раскомментируй тело и убери return.
+ */
 export function requestOtp(phone) {
-  return apiFetch('/auth/register/phone/request-otp', {
-    method: 'POST',
-    body: { phone: toApiPhone(phone) },
-  })
+  void phone
+  return Promise.resolve(null)
+  // return apiFetch('/auth/register/phone/request-otp', {
+  //   method: 'POST',
+  //   body: { phone: toApiPhone(phone) },
+  // })
 }
 
 /**
