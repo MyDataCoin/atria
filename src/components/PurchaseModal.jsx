@@ -86,11 +86,17 @@ export default function PurchaseModal({ property, onClose, onSuccess }) {
       onSuccess?.(app)
     } catch (err) {
       setStatus('error')
-      setError(
-        err instanceof ApiError
-          ? err.problem?.detail || 'Не удалось оформить заявку. Попробуйте позже'
-          : 'Сеть недоступна. Попробуйте ещё раз',
-      )
+      // 401 сюда доходит только когда обновить сессию не удалось (клиент уже стёр токены).
+      // Общее «не удалось оформить заявку» тут врёт: с заявкой всё в порядке, кончился вход.
+      if (err instanceof ApiError && err.status === 401) {
+        setError('Сессия истекла — войдите заново по кнопке «Войти» вверху страницы')
+      } else {
+        setError(
+          err instanceof ApiError
+            ? err.problem?.detail || 'Не удалось оформить заявку. Попробуйте позже'
+            : 'Сеть недоступна. Попробуйте ещё раз',
+        )
+      }
     }
   }
 

@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useContent, useLang } from '../i18n.jsx'
 import Registration from './Registration.jsx'
-import { tokens } from '../lib/api.js'
+import { tokens, onSessionLost } from '../lib/api.js'
+import { logout } from '../lib/auth.js'
 import { getKycStatus, KycStatus } from '../lib/kyc.js'
 
 const EASE = [0.16, 1, 0.3, 1]
@@ -15,6 +16,24 @@ export default function Nav() {
   const [scrolled, setScrolled] = useState(false)
   const [open, setOpen] = useState(false)
   const [authMode, setAuthMode] = useState(null) // null | 'register' | 'login'
+  // Шапка обязана показывать, вошёл человек или нет. Раньше «Войти» висело всегда, поэтому
+  // понять своё состояние было невозможно: вошёл ты, вышел, протухла ли сессия — вид один.
+  const [authed, setAuthed] = useState(() => tokens.isAuthed)
+
+  // Сессия могла умереть в любом фоновом запросе — сразу отражаем это в шапке.
+  useEffect(() => onSessionLost(() => setAuthed(false)), [])
+
+  const handleLogout = () => {
+    logout()
+    setAuthed(false)
+    setOpen(false)
+  }
+
+  // Модалка закрылась — состояние могло поменяться (вошли/вышли/протухло).
+  const closeAuth = () => {
+    setAuthMode(null)
+    setAuthed(tokens.isAuthed)
+  }
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40)
@@ -98,11 +117,17 @@ export default function Nav() {
             <span className={lang === 'kg' ? 'on' : ''}>{ui.langKg}</span>
           </button>
           <button type="button" className="nav-cta magnetic" onClick={openRegister}>
-            {nav.cta}
+            {authed ? 'Продолжить' : nav.cta}
           </button>
-          <button type="button" className="nav-cta magnetic login-btn" onClick={openLogin}>
-            Войти
-          </button>
+          {authed ? (
+            <button type="button" className="nav-cta magnetic login-btn" onClick={handleLogout}>
+              Выйти
+            </button>
+          ) : (
+            <button type="button" className="nav-cta magnetic login-btn" onClick={openLogin}>
+              Войти
+            </button>
+          )}
         </div>
 
         {/* burger icon — only visible on mobile via CSS */}
@@ -147,11 +172,17 @@ export default function Nav() {
                 </button>
 
                 <button type="button" className="nav-cta" onClick={openRegister}>
-                  {nav.cta}
+                  {authed ? 'Продолжить' : nav.cta}
                 </button>
-                <button type="button" className="nav-cta login-btn" onClick={openLogin}>
-                  Войти
-                </button>
+                {authed ? (
+                  <button type="button" className="nav-cta login-btn" onClick={handleLogout}>
+                    Выйти
+                  </button>
+                ) : (
+                  <button type="button" className="nav-cta login-btn" onClick={openLogin}>
+                    Войти
+                  </button>
+                )}
               </div>
             </motion.div>
           )}
@@ -160,7 +191,7 @@ export default function Nav() {
 
       <Registration
         mode={authMode}
-        onClose={() => setAuthMode(null)}
+        onClose={closeAuth}
       />
     </>
   )

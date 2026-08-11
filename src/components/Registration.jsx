@@ -4,7 +4,7 @@ import { requestOtp, verifyOtp } from '../lib/auth.js'
 import { submitKyc, getKycStatus, KycStatus, attachWallet, isValidWallet } from '../lib/kyc.js'
 import { openDiditVerification } from '../lib/didit.js'
 import { postConsent } from '../lib/consent.js'
-import { ApiError, tokens } from '../lib/api.js'
+import { ApiError, tokens, onSessionLost } from '../lib/api.js'
 import DocModal from './DocModal.jsx'
 import { CONSENT_FORM } from '../content.consent.js'
 
@@ -89,7 +89,7 @@ export default function Registration({ mode, onClose, onSuccess }) {
       setShowConsentDoc(false)
 
       // Куда открывать модалку:
-      // • не авторизован → телефон (шаг 1);
+      // • нет живой сессии → телефон (шаг 1);
       // • авторизован (или dev-обход) → пропускаем телефон и ведём на KYC (шаг 4) —
       //   это же возобновляет прерванную проверку при повторном входе;
       // • если KYC уже пройден (Approved) → на success (шаг 5) → кошелёк.
@@ -100,13 +100,33 @@ export default function Registration({ mode, onClose, onSuccess }) {
             .then((p) => {
               if (p?.status === KycStatus.Approved) setStep(5)
             })
-            .catch(() => {})
+            .catch((err) => {
+              // 401 здесь = обновить сессию не удалось (токены уже стёрты клиентом).
+              // Раньше эта ошибка молча проглатывалась, человек оставался на «Пройдите KYC»
+              // и упирался в тупик. Возвращаем ко входу — единственный шаг, который сейчас
+              // имеет смысл.
+              if (err instanceof ApiError && err.status === 401) {
+                setStep(1)
+                setError('Сессия истекла — войдите заново по номеру телефона')
+              }
+            })
         }
       } else {
         setStep(1)
       }
     }
   }, [isOpen, mode])
+
+  // Сессия может отвалиться на любом шаге и в любой ручке, не только в KYC. Один общий
+  // обработчик гарантирует, что человек всегда окажется на экране, где ЕСТЬ что нажать,
+  // вместо сообщения «войдите» на шаге, с которого войти нельзя.
+  useEffect(() => {
+    if (!isOpen) return undefined
+    return onSessionLost(() => {
+      setStep(1)
+      setError('Сессия истекла — войдите заново по номеру телефона')
+    })
+  }, [isOpen])
 
   // lock page scroll while modal is open
   useEffect(() => {
@@ -315,7 +335,11 @@ export default function Registration({ mode, onClose, onSuccess }) {
           setError('Проверка личности уже начата или завершена')
         }
       } else if (err instanceof ApiError && err.status === 401) {
-        setError('Нужна авторизация: сначала войдите по номеру телефона')
+        // Сессия умерла и не обновилась. Прежняя версия писала «сначала войдите по номеру» —
+        // и оставляла человека на шаге KYC, откуда войти было НЕЛЬЗЯ. Ведём на шаг 1 сами.
+        tokens.clear()
+        setStep(1)
+        setError('Сессия истекла — войдите заново по номеру телефона')
       } else if (err instanceof ApiError && err.status >= 500) {
         // 500 на /kyc/submit = бэкенд не смог открыть сессию у провайдера (Didit).
         // correlationId из ProblemDetails пригодится бэкенд-разрабу для поиска в логах.
