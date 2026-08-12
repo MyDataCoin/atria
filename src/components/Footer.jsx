@@ -148,6 +148,21 @@ export default function Footer() {
 
         </div>
 
+        {/* ── СВЕДЕНИЯ О ЮРЛИЦЕ ── */}
+        {footer.legal && (
+          <div className="footer-legal">
+            <h5>{footer.legal.h}</h5>
+            <dl className="footer-legal-grid">
+              {footer.legal.rows.map(([label, value]) => (
+                <div className="footer-legal-row" key={label}>
+                  <dt>{label}</dt>
+                  <dd>{value}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        )}
+
         {/* ── BOTTOM BAR ── */}
         <div className="footer-bottom">
           <span>{footer.bottomLeft}</span>
