@@ -393,6 +393,7 @@ export default function Registration({ mode, onClose, onSuccess }) {
       {isOpen && (
         <motion.div
           className="reg-overlay"
+          data-lenis-prevent
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -403,6 +404,7 @@ export default function Registration({ mode, onClose, onSuccess }) {
         >
           <motion.div
             className="reg-card"
+            data-lenis-prevent
             initial={{ opacity: 0, y: 24, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 16, scale: 0.97 }}

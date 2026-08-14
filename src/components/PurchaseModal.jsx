@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { createApplication } from '../lib/applications.js'
 import { getKycStatus, isKycApproved, KycStatus } from '../lib/kyc.js'
 import { ApiError, tokens } from '../lib/api.js'
+import Registration from './Registration.jsx'
 
 const EASE = [0.16, 1, 0.3, 1]
 // Иллюстративная годовая доходность для оценки прироста дохода (как в калькуляторе).
@@ -25,6 +26,10 @@ export default function PurchaseModal({ property, onClose, onSuccess }) {
   const [qty, setQty] = useState(1)
   const [status, setStatus] = useState('idle') // idle | loading | done | error
   const [error, setError] = useState('')
+  // Гейт KYC: 'unknown' (ещё не знаем) | 'ok' | 'none' | 'review' | 'rejected'
+  const [kyc, setKyc] = useState('unknown')
+  const [kycReason, setKycReason] = useState('')
+  const [showKyc, setShowKyc] = useState(false) // открыта ли модалка верификации
 
   // Сброс при каждом открытии нового объекта.
   useEffect(() => {
@@ -32,12 +37,38 @@ export default function PurchaseModal({ property, onClose, onSuccess }) {
       setQty(Math.min(100, maxQty))
       setStatus('idle')
       setError('')
+      setShowKyc(false)
     }
   }, [isOpen, maxQty])
 
+  // Статус KYC тянем сразу при открытии (и после закрытия модалки верификации),
+  // чтобы человек видел «нужно пройти KYC» до нажатия «Купить», а не после.
+  useEffect(() => {
+    if (!isOpen || showKyc) return
+    if (!tokens.isAuthed) {
+      setKyc('none')
+      return
+    }
+    let alive = true
+    getKycStatus()
+      .then((p) => {
+        if (!alive) return
+        if (!p) setKyc('none')
+        else if (p.status === KycStatus.Approved) setKyc('ok')
+        else if (p.status === KycStatus.Rejected) {
+          setKyc('rejected')
+          setKycReason(p.rejectionReason || '')
+        } else setKyc('review')
+      })
+      .catch(() => alive && setKyc('unknown'))
+    return () => {
+      alive = false
+    }
+  }, [isOpen, showKyc])
+
   // Блокируем прокрутку страницы и закрываем по Escape.
   useEffect(() => {
-    if (!isOpen) return
+    if (!isOpen || showKyc) return
     document.body.style.overflow = 'hidden'
     const onKey = (e) => e.key === 'Escape' && onClose?.()
     window.addEventListener('keydown', onKey)
@@ -45,7 +76,7 @@ export default function PurchaseModal({ property, onClose, onSuccess }) {
       document.body.style.overflow = ''
       window.removeEventListener('keydown', onKey)
     }
-  }, [isOpen, onClose])
+  }, [isOpen, showKyc, onClose])
 
   const calc = useMemo(() => {
     const investment = qty * price
@@ -56,6 +87,7 @@ export default function PurchaseModal({ property, onClose, onSuccess }) {
 
   if (!property) return null
 
+  const kycBlocked = kyc === 'none' || kyc === 'review' || kyc === 'rejected'
   const clampQty = (v) => Math.min(maxQty, Math.max(1, Math.floor(Number(v) || 1)))
   const priceLabel = `${fmt(price)} ${currency}`.trim()
 
@@ -69,16 +101,14 @@ export default function PurchaseModal({ property, onClose, onSuccess }) {
     setError('')
     try {
       // Гейт по KYC: заявку можно оформлять только с подтверждённой личностью.
-      const kyc = await getKycStatus()
-      if (!isKycApproved(kyc)) {
-        setStatus('error')
-        if (!kyc) {
-          setError('Сначала пройдите проверку личности (KYC) в профиле')
-        } else if (kyc.status === KycStatus.Rejected) {
-          setError(kyc.rejectionReason || 'Проверка личности отклонена. Обратитесь в поддержку')
-        } else {
-          setError('Проверка личности ещё не завершена. Дождитесь подтверждения KYC')
-        }
+      const profile = await getKycStatus()
+      if (!isKycApproved(profile)) {
+        setStatus('idle')
+        if (!profile) setKyc('none')
+        else if (profile.status === KycStatus.Rejected) {
+          setKyc('rejected')
+          setKycReason(profile.rejectionReason || '')
+        } else setKyc('review')
         return
       }
       const app = await createApplication(property.id, calc.investment)
@@ -105,6 +135,7 @@ export default function PurchaseModal({ property, onClose, onSuccess }) {
       {isOpen && (
         <motion.div
           className="reg-overlay"
+          data-lenis-prevent
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -115,6 +146,7 @@ export default function PurchaseModal({ property, onClose, onSuccess }) {
         >
           <motion.div
             className="reg-card buy-card"
+            data-lenis-prevent
             initial={{ opacity: 0, y: 24, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 16, scale: 0.97 }}
@@ -235,25 +267,50 @@ export default function PurchaseModal({ property, onClose, onSuccess }) {
                   </div>
                 </div>
 
+                {kycBlocked && (
+                  <div className="buy-kyc-gate">
+                    <strong>Для сделки нужно пройти KYC</strong>
+                    <p>
+                      {kyc === 'review'
+                        ? 'Проверка личности ещё идёт. Завершите её — покупка станет доступна сразу после подтверждения.'
+                        : kyc === 'rejected'
+                          ? kycReason ||
+                            'Проверка личности отклонена. Пройдите KYC заново или обратитесь в поддержку.'
+                          : 'Покупка токенов доступна только верифицированным инвесторам. Пройдите KYC — это займёт пару минут.'}
+                    </p>
+                  </div>
+                )}
+
                 {error && <div className="reg-error">{error}</div>}
 
                 <div className="buy-actions">
                   <button type="button" className="btn btn-ghost" onClick={onClose}>
                     <span>Отмена</span>
                   </button>
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    onClick={handleBuy}
-                    disabled={status === 'loading'}
-                  >
-                    <span>{status === 'loading' ? 'Оформляем…' : 'Купить'}</span>
-                    <span className="dot" />
-                  </button>
+                  {kycBlocked ? (
+                    <button type="button" className="btn btn-primary" onClick={() => setShowKyc(true)}>
+                      <span>Пройти KYC</span>
+                      <span className="dot" />
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={handleBuy}
+                      disabled={status === 'loading'}
+                    >
+                      <span>{status === 'loading' ? 'Оформляем…' : 'Купить'}</span>
+                      <span className="dot" />
+                    </button>
+                  )}
                 </div>
               </>
             )}
           </motion.div>
+
+          {/* Верификация переиспользует общий флоу регистрации: для авторизованного
+              пользователя Registration открывается сразу на шаге «Пройдите KYC». */}
+          <Registration mode={showKyc ? 'login' : null} onClose={() => setShowKyc(false)} />
         </motion.div>
       )}
     </AnimatePresence>

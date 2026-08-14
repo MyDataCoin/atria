@@ -3669,6 +3669,26 @@ body::after {
   color: var(--ink-2);
   margin: 0;
 }
+/* Гейт KYC: пока личность не подтверждена, покупка недоступна */
+.buy-kyc-gate {
+  margin-top: 0.9rem;
+  padding: 0.95rem 1.1rem;
+  border: 1px solid color-mix(in srgb, var(--ink) 18%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
+}
+.buy-kyc-gate strong {
+  display: block;
+  font-size: 0.92rem;
+  margin-bottom: 0.3rem;
+  color: var(--ink);
+}
+.buy-kyc-gate p {
+  font-size: 0.84rem;
+  line-height: 1.5;
+  color: var(--ink-2);
+  margin: 0;
+}
 .buy-actions {
   display: grid;
   grid-template-columns: 1fr 1.4fr;
