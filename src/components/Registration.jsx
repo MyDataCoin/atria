@@ -55,6 +55,33 @@ function digitsOnly(formatted) {
 }
 
 /**
+ * Что на самом деле пошло не так при подтверждении кода. Свалить всё в «неверный код» —
+ * значит обвинить человека в ошибке сервера и лишить себя единственной подсказки о том,
+ * что бэкенд недоступен.
+ */
+function verifyErrorMessage(err) {
+  if (!(err instanceof ApiError)) {
+    // fetch отклоняется без статуса только когда запрос вообще не дошёл.
+    return 'Нет связи с сервером. Проверьте интернет и попробуйте снова'
+  }
+  if (err.status === 409) return 'Код заблокирован после нескольких попыток. Запросите новый'
+  if (err.status === 429) return 'Слишком много попыток. Подождите немного и попробуйте снова'
+  if (err.status === 0 || err.status >= 500) {
+    return `Сервер сейчас недоступен (ошибка ${err.status}). Код тут ни при чём — попробуйте позже`
+  }
+  if (err.status === 400) {
+    // 400 приходит и на неверный код, и на непрошедшую валидацию номера — их надо различать.
+    const code = err.problem?.title || ''
+    const detail = err.problem?.detail || ''
+    if (code.startsWith('otp.') || /код|code/i.test(detail)) {
+      return 'Неверный код, попробуйте снова'
+    }
+    return detail || 'Запрос отклонён сервером. Проверьте номер и попробуйте снова'
+  }
+  return `Не удалось подтвердить код (ошибка ${err.status}). Попробуйте позже`
+}
+
+/**
  * Auth modal — phone number + SMS code over the real Atria phone-OTP flow.
  * The same UI serves both даregister" and "login": the backend's verify-otp
  * creates the account on first use or signs into the existing one.
@@ -259,11 +286,10 @@ export default function Registration({ mode, onClose, onSuccess }) {
       setStep(3)
       onSuccess?.({ phone, mode, tokens: result })
     } catch (err) {
-      if (err instanceof ApiError && err.status === 409) {
-        setError('Код заблокирован после нескольких попыток. Запросите новый')
-      } else {
-        setError('Неверный код, попробуйте снова')
-      }
+      // Раньше сюда сваливалась ЛЮБАЯ ошибка и подписывалась «неверный код»: лежащий бэкенд,
+      // упавший прокси, отсутствие сети — всё выглядело как ошибка человека, который ввёл
+      // правильные цифры. Разделяем: код неверен только когда так сказал сервер.
+      setError(verifyErrorMessage(err))
       setCode(Array(CODE_LENGTH).fill(''))
       setTimeout(() => inputsRef.current[0]?.focus(), 50)
     } finally {
