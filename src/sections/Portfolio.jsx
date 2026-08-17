@@ -4,7 +4,7 @@ import { Accent } from '../lib/accent.jsx'
 import SHead from '../components/SHead.jsx'
 import Reveal from '../components/Reveal.jsx'
 import { useContent } from '../i18n.jsx'
-import { listProperties } from '../lib/properties.js'
+import { isDraft, listBuildings, listProperties } from '../lib/properties.js'
 import PurchaseModal from '../components/PurchaseModal.jsx'
 import DetailsModal from '../components/DetailsModal.jsx'
 
@@ -18,6 +18,33 @@ const GRADIENTS = [
 ]
 
 const fmt = (n) => new Intl.NumberFormat('ru-RU').format(Number(n) || 0)
+
+/** Тип помещения с бэкенда → человеческая подпись. */
+const UNIT_TYPES = {
+  apartment: 'Квартира',
+  garage: 'Гараж',
+  parking_space: 'Парковочное место',
+  commercial: 'Коммерческое помещение',
+  storage: 'Кладовая',
+  other: 'Помещение',
+}
+
+/**
+ * Строка характеристик помещения: «Квартира №12 · 3-комн. · 128,82 м² · 4 этаж».
+ * У самостоятельного выпуска (не входит в здание) полей нет — вернём пустую строку.
+ */
+function unitLine(dto) {
+  const area = Number(dto.totalAreaSqM)
+  return [
+    UNIT_TYPES[dto.unitType] || null,
+    dto.unitNumber ? `№${dto.unitNumber}` : null,
+    dto.roomCount ? `${dto.roomCount}-комн.` : null,
+    Number.isFinite(area) && area > 0 ? `${area.toLocaleString('ru-RU')} м²` : null,
+    dto.floorNumber != null ? `${dto.floorNumber} этаж` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ')
+}
 
 /** Метка статуса по ключу — берём из фильтров контента, чтобы не дублировать переводы. */
 function statusLabel(filters, key) {
@@ -59,6 +86,7 @@ function fromApi(dto, i, ui, filters) {
     status: statusLabel(filters, statusKey),
     salesPaused: dto.salesPaused === true, // продажи временно приостановлены (кнопка «Купить» блокируется)
     img: dto.images?.[0]?.url || undefined, // первая фотка — обложка карточки (иначе градиент)
+    unitLine: unitLine(dto), // «Квартира №12 · 3-комн. · 128,82 м²» — пусто у самостоятельных выпусков
     details: [],
     raw: dto, // полный объект для модалки покупки
   }
@@ -107,6 +135,7 @@ function PCard({ p, i, ui, onBuy, onDetails }) {
       <div className="pcard-body">
         {!isSoon && p.loc && <span className="loc">{p.loc}</span>}
         <h3>{p.name}</h3>
+        {p.unitLine && <span className="punit">{p.unitLine}</span>}
         {p.type && <span className="ptype">{p.type}</span>}
 
         {!isSoon && (
@@ -214,34 +243,123 @@ function PCard({ p, i, ui, onBuy, onDetails }) {
   )
 }
 
+/** 1 помещение / 2 помещения / 5 помещений — счётчик в шапке здания. */
+function unitsPlural(n) {
+  const mod10 = n % 10
+  const mod100 = n % 100
+  if (mod10 === 1 && mod100 !== 11) return `${n} помещение`
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return `${n} помещения`
+  return `${n} помещений`
+}
+
+/**
+ * Здание со списком помещений внутри: шапка с адресом и характеристиками, под ней —
+ * сетка карточек квартир и гаражей. Каждое помещение продаётся отдельно, здание само
+ * ничего не выпускает, поэтому у шапки нет ни цены, ни прогресса.
+ */
+function BuildingGroup({ group, ui, onBuy, onDetails, onBuildingDetails }) {
+  const { building, cards } = group
+  const meta = [
+    building.city,
+    building.address,
+    building.yearBuilt ? `${building.yearBuilt} г.` : null,
+    building.floors ? `${building.floors} эт.` : null,
+    building.developer,
+  ]
+    .filter(Boolean)
+    .join(' · ')
+
+  const cover = building.images?.[0]?.url
+
+  return (
+    <Reveal as="div" className="pgroup" y={24} amount={0.1}>
+      <div className="pgroup-head">
+        {cover && (
+          <div className="pgroup-cover" style={{ backgroundImage: `url(${cover})` }} aria-hidden="true" />
+        )}
+        <div className="pgroup-info">
+          <span className="pgroup-eyebrow">Здание</span>
+          <h3 className="pgroup-name">{building.name}</h3>
+          {meta && <span className="pgroup-meta">{meta}</span>}
+        </div>
+        <div className="pgroup-side">
+          <span className="pgroup-count">{unitsPlural(cards.length)}</span>
+          <button
+            type="button"
+            className="pgroup-more"
+            onClick={() => onBuildingDetails(building)}
+          >
+            О здании
+          </button>
+        </div>
+      </div>
+
+      {building.description && <p className="pgroup-desc">{building.description}</p>}
+
+      {/* Колонок ровно столько, сколько помещений (но не больше трёх): у здания с двумя
+          квартирами карточки заполняют ряд целиком, а не жмутся в две трети с дыркой справа. */}
+      <div className="pgrid pgroup-grid" data-cols={Math.min(cards.length, 3)}>
+        {cards.map((p, i) => (
+          <PCard key={p.id} p={p} i={i} ui={ui} onBuy={onBuy} onDetails={onDetails} />
+        ))}
+      </div>
+    </Reveal>
+  )
+}
+
 export default function Portfolio() {
   const c = useContent().portfolio
   const { ui, filters } = c
 
   const [filter, setFilter] = useState('all')
-  const [state, setState] = useState({ status: 'loading', cards: [] })
+  // groups — здания с их помещениями, loose — самостоятельные выпуски вне здания.
+  const [state, setState] = useState({ status: 'loading', groups: [], loose: [] })
   const [buying, setBuying] = useState(null) // выбранный объект для покупки
-  const [details, setDetails] = useState(null) // выбранный объект для «Подробнее»
+  const [details, setDetails] = useState(null) // выбранное помещение для «Подробнее»
+  const [buildingDetails, setBuildingDetails] = useState(null) // выбранное здание для «О здании»
 
   useEffect(() => {
     let alive = true
-    setState({ status: 'loading', cards: [] })
-    listProperties()
-      .then((data) => {
+    setState({ status: 'loading', groups: [], loose: [] })
+
+    // Черновики видны только в админке; авторизованному админу бэкенд отдаёт их
+    // вместе с опубликованными, поэтому фильтруем на своей стороне.
+    const visible = (list) => (Array.isArray(list) ? list : []).filter((dto) => !isDraft(dto))
+
+    Promise.all([
+      // Здание уже приносит свои помещения, так что второй запрос нужен только ради
+      // выпусков вне зданий — иначе юниты пришли бы дважды.
+      listBuildings().catch(() => null),
+      listProperties(),
+    ])
+      .then(([buildingList, propertyList]) => {
         if (!alive) return
-        // draft — черновики, видны только в админке; на сайт не показываем.
-        const list = (Array.isArray(data) ? data : []).filter((dto) => dto.status !== 'draft')
-        setState({
-          status: 'ready',
-          cards: list.map((dto, i) => fromApi(dto, i, ui, filters)),
-        })
+
+        let seq = 0
+        const groups = (Array.isArray(buildingList) ? buildingList : [])
+          // Черновое здание не показываем целиком, даже если внутри есть опубликованные
+          // помещения: пока здание в черновике, его на витрине быть не должно.
+          .filter((building) => !isDraft(building))
+          .map((building) => ({
+            building,
+            cards: visible(building.units).map((dto) => fromApi(dto, seq++, ui, filters)),
+          }))
+          .filter((g) => g.cards.length > 0)
+
+        // Если /buildings недоступен (старый бэкенд), показываем всё плоским списком.
+        const loose = visible(propertyList)
+          .filter((dto) => (buildingList ? !dto.buildingId : true))
+          .map((dto) => fromApi(dto, seq++, ui, filters))
+
+        setState({ status: 'ready', groups, loose })
       })
       .catch(() => {
         if (!alive) return
         // Бэкенд недоступен — показываем статические объекты как запасной вариант.
         setState({
           status: 'error',
-          cards: (c.items || []).map((p) => fromStatic(p, ui)),
+          groups: [],
+          loose: (c.items || []).map((p) => fromStatic(p, ui)),
         })
       })
     return () => {
@@ -250,10 +368,19 @@ export default function Portfolio() {
     // ui/filters/items берутся из одного объекта контента — пересобираем при смене языка
   }, [c, ui, filters])
 
-  const items = useMemo(
-    () => (filter === 'all' ? state.cards : state.cards.filter((p) => p.statusKey === filter)),
-    [filter, state.cards],
-  )
+  // Фильтр статуса применяется к помещениям; здание пропадает, когда под него ничего не подошло.
+  const { groups, loose, total } = useMemo(() => {
+    const keep = (p) => filter === 'all' || p.statusKey === filter
+    const g = state.groups
+      .map((group) => ({ ...group, cards: group.cards.filter(keep) }))
+      .filter((group) => group.cards.length > 0)
+    const l = state.loose.filter(keep)
+    return {
+      groups: g,
+      loose: l,
+      total: g.reduce((acc, group) => acc + group.cards.length, 0) + l.length,
+    }
+  }, [filter, state.groups, state.loose])
 
   return (
     <section className={`section surface-${c.surface}`} id={c.id}>
@@ -271,26 +398,51 @@ export default function Portfolio() {
             </button>
           ))}
           <span className="count">
-            {items.length} {ui.count}
+            {total} {ui.count}
           </span>
         </div>
 
         {state.status === 'loading' && <p className="s-note">{ui.loading}</p>}
         {state.status === 'error' && <p className="reg-error">{ui.errorText}</p>}
-        {state.status === 'ready' && items.length === 0 && (
-          <p className="s-note">{ui.empty}</p>
-        )}
+        {state.status === 'ready' && total === 0 && <p className="s-note">{ui.empty}</p>}
 
-        <motion.div className="pgrid" layout>
-          <AnimatePresence>
-            {items.map((p, i) => (
-              <PCard key={p.id} p={p} i={i} ui={ui} onBuy={setBuying} onDetails={setDetails} />
-            ))}
-          </AnimatePresence>
-        </motion.div>
+        {/* Здание → его квартиры и гаражи. Каждое помещение продаётся отдельно. */}
+        <div className="pgroups">
+          {groups.map((group) => (
+            <BuildingGroup
+              key={group.building.id}
+              group={group}
+              ui={ui}
+              onBuy={setBuying}
+              onDetails={setDetails}
+              onBuildingDetails={setBuildingDetails}
+            />
+          ))}
+        </div>
+
+        {/* Выпуски вне зданий — отдельной сеткой, как раньше. */}
+        {loose.length > 0 && (
+          <motion.div className="pgrid" layout>
+            <AnimatePresence>
+              {loose.map((p, i) => (
+                <PCard key={p.id} p={p} i={i} ui={ui} onBuy={setBuying} onDetails={setDetails} />
+              ))}
+            </AnimatePresence>
+          </motion.div>
+        )}
 
         <PurchaseModal property={buying} onClose={() => setBuying(null)} />
         <DetailsModal property={details} onClose={() => setDetails(null)} />
+        <DetailsModal
+          isBuilding
+          property={buildingDetails}
+          onClose={() => setBuildingDetails(null)}
+          // Клик по помещению в списке здания — переключаемся на его карточку.
+          onOpenUnit={(unit) => {
+            setBuildingDetails(null)
+            setDetails(unit)
+          }}
+        />
 
         <Reveal as="div" className="port-strip">
           <p>

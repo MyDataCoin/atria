@@ -5,6 +5,22 @@
 import { apiFetch, tokens } from './api.js'
 
 /**
+ * Черновик ли объект (помещение или здание). Админам бэкенд отдаёт черновики вместе
+ * с опубликованными — на витрине их быть не должно. Статус сравниваем без учёта
+ * регистра и разделителей и заодно смотрим на возможные флаги: если бэкенд назовёт
+ * поле иначе, черновик всё равно не утечёт на сайт.
+ * @param {object} dto PropertyDto или BuildingDto
+ */
+export function isDraft(dto) {
+  if (!dto) return true
+  if (dto.isDraft === true || dto.isPublished === false || dto.published === false) return true
+  const status = String(dto.status ?? '')
+    .toLowerCase()
+    .replace(/[\s_-]/g, '')
+  return status === 'draft' || status === 'archived' || status === 'hidden'
+}
+
+/**
  * Список объектов. Чтение публичное, но если пользователь авторизован —
  * шлём Bearer (бэкенд может вернуть расширенные поля).
  * @returns {Promise<Array>} массив PropertyDto
@@ -20,6 +36,26 @@ export function listProperties() {
  */
 export function getProperty(id) {
   return apiFetch(`/properties/${id}`, { auth: tokens.isAuthed })
+}
+
+/**
+ * Список зданий вместе с помещениями внутри (`units` — те же PropertyDto).
+ * Здание само токенов не выпускает: оно только группирует квартиры и гаражи,
+ * у каждого из которых свой выпуск. Чтение публичное; черновые помещения
+ * бэкенд отдаёт только сотрудникам.
+ * @returns {Promise<Array>} массив BuildingDto
+ */
+export function listBuildings() {
+  return apiFetch('/buildings', { auth: tokens.isAuthed })
+}
+
+/**
+ * Одно здание по id (с его помещениями).
+ * @param {string} id uuid здания
+ * @returns {Promise<object>} BuildingDto
+ */
+export function getBuilding(id) {
+  return apiFetch(`/buildings/${id}`, { auth: tokens.isAuthed })
 }
 
 /**

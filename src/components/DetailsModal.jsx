@@ -1,9 +1,26 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { isDraft } from '../lib/properties.js'
 
 const EASE = [0.16, 1, 0.3, 1]
 
 const fmt = (n) => new Intl.NumberFormat('ru-RU').format(Math.round(Number(n) || 0))
+
+// Площадь показываем как есть, с двумя знаками: 128,82 м².
+const area = (n) =>
+  new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(
+    Number(n) || 0,
+  )
+
+/** Тип помещения с бэкенда → человеческая подпись. */
+const UNIT_TYPES = {
+  apartment: 'Квартира',
+  garage: 'Гараж',
+  parking_space: 'Парковочное место',
+  commercial: 'Коммерческое помещение',
+  storage: 'Кладовая',
+  other: 'Помещение',
+}
 
 // Берём первое непустое значение из возможных имён поля (бэкенд может ещё не отдавать часть).
 const pick = (obj, keys) => {
@@ -15,11 +32,13 @@ const pick = (obj, keys) => {
 }
 
 /**
- * Модалка «Подробнее» для объекта: галерея фото, описание, параметры выпуска,
- * характеристики (появляются по мере того, как бэкенд добавляет их в PropertyDto),
- * документы. Если выпуск на паузе — показываем пометку.
+ * Модалка «Подробнее»: галерея фото, описание, характеристики, документы, карта.
+ *
+ * Работает и для помещения (PropertyDto), и для здания (BuildingDto) — у них общий
+ * набор полей, а различаются они тем, что у здания нет выпуска и планировки, зато
+ * есть список помещений внутри. Режим задаётся пропом `isBuilding`.
  */
-export default function DetailsModal({ property, onClose }) {
+export default function DetailsModal({ property, onClose, isBuilding = false, onOpenUnit }) {
   const isOpen = Boolean(property)
   const [imgIndex, setImgIndex] = useState(0)
   const [zoomed, setZoomed] = useState(false) // открыт ли лайтбокс с увеличенным фото
@@ -71,6 +90,18 @@ export default function DetailsModal({ property, onClose }) {
       floors: pick(property, ['floors', 'floor', 'floorCount', 'storeys']),
       address: pick(property, ['address', 'fullAddress', 'location']),
       salesPaused: property.salesPaused === true,
+      // Помещение внутри здания: чем оно является и из чего состоит.
+      unitType: UNIT_TYPES[property.unitType] || null,
+      unitNumber: pick(property, ['unitNumber']),
+      floorNumber: property.floorNumber ?? null,
+      roomCount: property.roomCount ?? null,
+      totalArea: Number(property.totalAreaSqM) > 0 ? Number(property.totalAreaSqM) : null,
+      rooms: (Array.isArray(property.rooms) ? property.rooms : []).filter((r) => r?.name),
+      // Только для здания: помещения внутри. Черновики на витрину не пускаем — админу
+      // бэкенд отдаёт их наравне с опубликованными.
+      units: (Array.isArray(property.units) ? property.units : []).filter(
+        (u) => u?.id && !isDraft(u),
+      ),
     }
   }, [property])
 
@@ -81,14 +112,38 @@ export default function DetailsModal({ property, onClose }) {
     mapQuery,
   )}&t=&z=14&ie=UTF8&iwloc=&output=embed`
 
-  const rows = [
-    ['Тип недвижимости', data.type],
-    ['Город', data.city],
-    ['Год постройки', data.year],
-    ['Застройщик', data.developer],
-    ['Этажность', data.floors],
-    ['Адрес', data.address],
-  ].filter(([, v]) => v != null)
+  const rows = (
+    isBuilding
+      ? [
+          // У здания своих «этажа» и «комнатности» нет — только про сам дом.
+          ['Тип недвижимости', data.type],
+          ['Город', data.city],
+          ['Год постройки', data.year],
+          ['Застройщик', data.developer],
+          ['Этажность', data.floors],
+          ['Адрес', data.address],
+          ['Помещений в продаже', data.units.length || null],
+        ]
+      : [
+          // Сначала само помещение — ради него человек и открыл карточку.
+          ['Тип помещения', data.unitType],
+          ['Номер', data.unitNumber],
+          ['Этаж', data.floorNumber],
+          ['Комнатность', data.roomCount ? `${data.roomCount}-комнатная` : null],
+          ['Общая площадь', data.totalArea ? `${area(data.totalArea)} м²` : null],
+          // Дальше — про здание, в котором оно находится.
+          ['Тип недвижимости', data.type],
+          ['Город', data.city],
+          ['Год постройки', data.year],
+          ['Застройщик', data.developer],
+          ['Этажность здания', data.floors],
+          ['Адрес', data.address],
+        ]
+  ).filter(([, v]) => v != null)
+
+  // Сумма комнат может не сходиться с общей площадью — так бывает в планах, поэтому
+  // показываем обе цифры и ничего не «поправляем».
+  const roomsSum = data.rooms.reduce((acc, r) => acc + (Number(r.areaSqM) || 0), 0)
 
   const imgCount = data.images.length
   const goImg = (dir) => setImgIndex((i) => (i + dir + imgCount) % imgCount)
@@ -124,7 +179,7 @@ export default function DetailsModal({ property, onClose }) {
               </svg>
             </button>
 
-            <span className="eyebrow">Об объекте</span>
+            <span className="eyebrow">{isBuilding ? 'О здании' : 'Об объекте'}</span>
             <h2 className="reg-title display details-title">{property.name}</h2>
 
             {/* Галерея фото объекта: стрелки, счётчик, клик — увеличить. */}
@@ -202,6 +257,61 @@ export default function DetailsModal({ property, onClose }) {
                     <span className="details-row-value">{value}</span>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {isBuilding && data.units.length > 0 && (
+              <div className="details-section">
+                <h4>Помещения в здании</h4>
+                <div className="details-units">
+                  {data.units.map((u) => {
+                    const a = Number(u.totalAreaSqM)
+                    const line = [
+                      UNIT_TYPES[u.unitType] || null,
+                      u.unitNumber ? `№${u.unitNumber}` : null,
+                      u.roomCount ? `${u.roomCount}-комн.` : null,
+                      Number.isFinite(a) && a > 0 ? `${area(a)} м²` : null,
+                      u.floorNumber != null ? `${u.floorNumber} этаж` : null,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')
+                    return (
+                      <button
+                        type="button"
+                        className="details-unit"
+                        key={u.id}
+                        onClick={() => onOpenUnit?.(u)}
+                      >
+                        <span className="details-unit-name">{u.name}</span>
+                        {line && <span className="details-unit-line">{line}</span>}
+                        <span className="details-unit-go" aria-hidden="true">→</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {data.rooms.length > 0 && (
+              <div className="details-section">
+                <h4>Планировка</h4>
+                <div className="details-rooms">
+                  {data.rooms.map((room, i) => (
+                    <div className="details-room" key={room.id || i}>
+                      <span className="details-room-name">{room.name}</span>
+                      <span className="details-room-area">{area(room.areaSqM)} м²</span>
+                    </div>
+                  ))}
+                  <div className="details-room total">
+                    <span className="details-room-name">Итого</span>
+                    <span className="details-room-area">
+                      {area(roomsSum)} м²
+                      {data.totalArea && Math.abs(data.totalArea - roomsSum) > 0.01
+                        ? ` из ${area(data.totalArea)} м²`
+                        : ''}
+                    </span>
+                  </div>
+                </div>
               </div>
             )}
 

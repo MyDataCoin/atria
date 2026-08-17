@@ -1,7 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { requestOtp, verifyOtp } from '../lib/auth.js'
-import { submitKyc, getKycStatus, KycStatus, attachWallet, isValidWallet } from '../lib/kyc.js'
+import {
+  submitKyc,
+  getKycStatus,
+  KycStatus,
+  attachWallet,
+  isValidWallet,
+  wasKycSubmitted,
+  markKycSubmitted,
+  clearKycSubmitted,
+  waitForKycDecision,
+} from '../lib/kyc.js'
 import { openDiditVerification } from '../lib/didit.js'
 import { postConsent } from '../lib/consent.js'
 import { ApiError, tokens, onSessionLost } from '../lib/api.js'
@@ -92,13 +102,26 @@ export default function Registration({ mode, onClose, onSuccess }) {
       // • нет живой сессии → телефон (шаг 1);
       // • авторизован (или dev-обход) → пропускаем телефон и ведём на KYC (шаг 4) —
       //   это же возобновляет прерванную проверку при повторном входе;
-      // • если KYC уже пройден (Approved) → на success (шаг 5) → кошелёк.
+      // • если KYC уже пройден (Approved) или сдан и ждёт решения вебхука → шаг 5 → кошелёк.
       if (KYC_ONLY_DEV || tokens.isAuthed) {
         setStep(4)
         if (tokens.isAuthed) {
           getKycStatus()
             .then((p) => {
-              if (p?.status === KycStatus.Approved) setStep(5)
+              if (!p) {
+                clearKycSubmitted() // профиля нет — старая отметка протухла
+                return
+              }
+              if (p.status === KycStatus.Approved) {
+                clearKycSubmitted()
+                setStep(5)
+              } else if (p.status === KycStatus.Rejected) {
+                clearKycSubmitted()
+              } else if (wasKycSubmitted()) {
+                // Проверку человек уже прошёл, решение ещё не доехало — не заставляем
+                // проходить её заново, ведём к последнему шагу с кошельком.
+                setStep(5)
+              }
             })
             .catch((err) => {
               // 401 здесь = обновить сессию не удалось (токены уже стёрты клиентом).
@@ -317,16 +340,32 @@ export default function Registration({ mode, onClose, onSuccess }) {
         return
       }
 
-      // Завершено. Показываем экран «проверка пройдена» с кнопкой «Следующий этап» → кошелёк.
+      // Завершено. Помечаем, что проверка сдана: решение придёт вебхуком, и до его прихода
+      // профиль остаётся в UnderReview — без этой отметки сайт снова попросил бы пройти KYC.
+      markKycSubmitted()
+      // Даём вебхуку несколько секунд: если решение успеет прийти, отметка снимется сама,
+      // а отказ покажем здесь же, не пуская человека дальше на кошелёк.
+      const decided = await waitForKycDecision({ attempts: 4, intervalMs: 1200 }).catch(() => null)
+      if (decided?.status === KycStatus.Rejected) {
+        setError(decided.rejectionReason || 'Проверка личности отклонена. Обратитесь в поддержку')
+        return
+      }
+      // Показываем экран «проверка пройдена» с кнопкой «Следующий этап» → кошелёк.
       setStep(5)
     } catch (err) {
       if (err instanceof ApiError && err.status === 400) {
         // KYC уже пройден/начат — смотрим реальный статус профиля.
         const profile = await getKycStatus().catch(() => null)
         if (profile?.status === KycStatus.Approved) {
+          clearKycSubmitted()
           setStep(5) // верифицирован → «Следующий этап» → кошелёк
         } else if (profile?.status === KycStatus.Rejected) {
+          clearKycSubmitted()
           setError(profile.rejectionReason || 'Проверка личности отклонена. Обратитесь в поддержку')
+        } else if (profile && wasKycSubmitted()) {
+          // Свою часть человек уже сделал, ждём только вебхук — не гоняем его по кругу,
+          // ведём дальше к кошельку.
+          setStep(5)
         } else if (profile) {
           // UnderReview/Pending: сессия открыта, но не завершена. Пересоздать её фронт не может
           // (бэкенд запрещает ресабмит и не отдаёт verificationUrl) — нужна доработка бэка.
@@ -648,9 +687,14 @@ export default function Registration({ mode, onClose, onSuccess }) {
                     </svg>
                   </div>
 
-                  <h2 className="reg-title display">Проверка личности пройдена</h2>
+                  {/* Пока вебхук с решением не пришёл, честнее писать «отправлена», а не «пройдена». */}
+                  <h2 className="reg-title display">
+                    {wasKycSubmitted() ? 'Проверка отправлена' : 'Проверка личности пройдена'}
+                  </h2>
                   <p className="reg-sub">
-                    Остался последний шаг — привяжите криптокошелёк для зачисления токенов.
+                    {wasKycSubmitted()
+                      ? 'Решение придёт в течение нескольких минут. Проходить проверку заново не нужно — пока привяжите криптокошелёк для зачисления токенов.'
+                      : 'Остался последний шаг — привяжите криптокошелёк для зачисления токенов.'}
                   </p>
 
                   <button className="btn btn-primary reg-submit" onClick={() => setStep(6)}>

@@ -78,3 +78,59 @@ export function attachWallet(walletAddress) {
     body: { walletAddress: String(walletAddress).trim() },
   })
 }
+
+// Решение по KYC приходит вебхуком от провайдера, поэтому сразу после того, как человек
+// закрыл окно Didit, профиль ещё висит в UnderReview. Без отметки «проверку он уже прошёл»
+// сайт при следующем заходе снова открывал ему экран «Пройдите KYC» — хотя пройти её
+// повторно нельзя (бэкенд запрещает ресабмит). Флаг живёт в localStorage и снимается,
+// когда бэкенд отдаёт финальный статус.
+const SUBMITTED_KEY = 'atria.kyc.submitted'
+
+/** Отметить, что пользователь довёл проверку до конца и ждёт решения провайдера. */
+export function markKycSubmitted() {
+  try {
+    localStorage.setItem(SUBMITTED_KEY, String(Date.now()))
+  } catch {
+    /* приватный режим / переполненное хранилище — не критично */
+  }
+}
+
+/** Снять отметку: решение пришло (Approved или Rejected) либо профиля больше нет. */
+export function clearKycSubmitted() {
+  try {
+    localStorage.removeItem(SUBMITTED_KEY)
+  } catch {
+    /* см. выше */
+  }
+}
+
+/** Проходил ли пользователь проверку в этом браузере и ждёт ли решения. */
+export function wasKycSubmitted() {
+  try {
+    return Boolean(localStorage.getItem(SUBMITTED_KEY))
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Дождаться решения по KYC: опрашиваем GET /kyc/me, пока статус не станет финальным
+ * (Approved/Rejected) или пока не выйдет время. Нужен сразу после закрытия окна Didit —
+ * вебхук обычно доходит за несколько секунд.
+ * @param {object} [opts]
+ * @param {number} [opts.attempts] сколько раз опросить
+ * @param {number} [opts.intervalMs] пауза между опросами
+ * @returns {Promise<object|null>} последний известный профиль
+ */
+export async function waitForKycDecision({ attempts = 6, intervalMs = 1500 } = {}) {
+  let profile = null
+  for (let i = 0; i < attempts; i += 1) {
+    profile = await getKycStatus().catch(() => profile)
+    if (profile?.status === KycStatus.Approved || profile?.status === KycStatus.Rejected) {
+      clearKycSubmitted()
+      return profile
+    }
+    if (i < attempts - 1) await new Promise((r) => setTimeout(r, intervalMs))
+  }
+  return profile
+}

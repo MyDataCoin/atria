@@ -2366,10 +2366,128 @@ body::after {
   color: var(--ink-3);
   margin-left: auto;
 }
+/* Здание и его помещения: шапка с адресом, под ней сетка квартир/гаражей.
+   Здание — только группировка, продаётся каждое помещение по отдельности. */
+.pgroups {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(2.4rem, 5vw, 3.6rem);
+}
+.pgroups:not(:empty) + .pgrid {
+  margin-top: clamp(2.4rem, 5vw, 3.6rem);
+}
+.pgroup-head {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding-bottom: 0.9rem;
+  margin-bottom: clamp(1.2rem, 2.5vw, 1.8rem);
+  border-bottom: 1px solid var(--line);
+}
+.pgroup-cover {
+  width: 68px;
+  height: 68px;
+  flex: none;
+  border-radius: 10px;
+  background-size: cover;
+  background-position: center;
+  background-color: var(--ink);
+}
+.pgroup-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+.pgroup-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--amber-deep, var(--amber));
+}
+.pgroup-name {
+  font-family: var(--font-display);
+  font-size: clamp(1.35rem, 2.4vw, 1.75rem);
+  font-weight: 450;
+  line-height: 1.15;
+}
+.pgroup-meta {
+  font-size: 0.82rem;
+  font-weight: 300;
+  color: var(--ink-3);
+}
+.pgroup-side {
+  margin-left: auto;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.45rem;
+}
+.pgroup-count {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+.pgroup-more {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink);
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 100px;
+  padding: 0.4em 0.95em;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.3s var(--ease), color 0.3s var(--ease), border-color 0.3s var(--ease);
+}
+.pgroup-more:hover {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper);
+}
+.pgroup-desc {
+  margin: -0.4rem 0 clamp(1.2rem, 2.5vw, 1.8rem);
+  max-width: 62ch;
+  font-size: 0.92rem;
+  font-weight: 300;
+  line-height: 1.55;
+  color: var(--ink-2);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+@media (max-width: 640px) {
+  .pgroup-head {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .pgroup-cover {
+    width: 52px;
+    height: 52px;
+  }
+  .pgroup-count {
+    display: none;
+  }
+}
 .pgrid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: clamp(1.2rem, 2.5vw, 1.8rem);
+}
+/* Сетка помещений внутри здания: колонок ровно по числу квартир (макс. 3). Ширина колонки
+   зафиксирована на размере обычной карточки из сетки на три — иначе одна-две квартиры
+   растягивались на пол-экрана и выглядели огромными. */
+.pgroup-grid[data-cols='1'] {
+  grid-template-columns: minmax(0, 360px);
+}
+.pgroup-grid[data-cols='2'] {
+  grid-template-columns: repeat(2, minmax(0, 360px));
 }
 @media (max-width: 980px) {
   .pgrid {
@@ -2377,7 +2495,8 @@ body::after {
   }
 }
 @media (max-width: 640px) {
-  .pgrid {
+  .pgrid,
+  .pgroup-grid[data-cols] {
     grid-template-columns: 1fr;
   }
 }
@@ -2445,6 +2564,12 @@ body::after {
   font-family: var(--font-display);
   font-size: 1.35rem;
   font-weight: 450;
+}
+.pcard-body .punit {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--ink-2);
+  margin-top: -0.35rem;
 }
 .pcard-body .ptype {
   font-size: 0.82rem;
@@ -3076,19 +3201,31 @@ body::after {
   text-transform: uppercase;
   color: var(--ink-3);
 }
-.reg-field input[type='tel'] {
+/* Поле ввода в модалке. Раньше стиль висел только на type='tel', и адрес кошелька
+   (type='text') рендерился системным инпутом — низким и тесным. */
+.reg-field input[type='tel'],
+.reg-field input[type='text'] {
   width: 100%;
   font-family: var(--font-sans);
   font-size: 1.05rem;
+  line-height: 1.4;
+  min-height: 60px;
   color: var(--ink);
   background: var(--paper);
   border: 1px solid var(--line);
   border-radius: 12px;
-  padding: 0.9em 1em;
+  padding: 1.05em 1em;
   outline: none;
   transition: border-color 0.3s var(--ease), background 0.3s var(--ease);
 }
-.reg-field input[type='tel']:focus {
+/* Адрес кошелька — 42 символа hex: моноширинный шрифт читается заметно легче. */
+.reg-field input[type='text'] {
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+  letter-spacing: 0.01em;
+}
+.reg-field input[type='tel']:focus,
+.reg-field input[type='text']:focus {
   border-color: var(--amber);
   background: var(--paper-2);
 }
@@ -3582,7 +3719,8 @@ body::after {
   cursor: pointer;
 }
 .buy-qty-input {
-  width: 92px;
+  /* Доля дробная, и в поле должно помещаться «10 000,01» целиком, а не обрезаться. */
+  width: 132px;
   padding: 0.7rem 0.8rem;
   text-align: center;
   font-size: 1rem;
@@ -4017,6 +4155,90 @@ body::after {
   color: var(--ink);
   text-align: right;
 }
+/* Помещения внутри здания: строка-кнопка, ведёт на карточку помещения. */
+.details-units {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.details-unit {
+  display: flex;
+  align-items: baseline;
+  gap: 0.8rem;
+  width: 100%;
+  padding: 0.7rem 0.9rem;
+  text-align: left;
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: border-color 0.3s var(--ease), transform 0.3s var(--ease);
+}
+.details-unit:hover {
+  border-color: var(--ink-3);
+  transform: translateX(2px);
+}
+.details-unit-name {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--ink);
+}
+.details-unit-line {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--ink-3);
+}
+.details-unit-go {
+  margin-left: auto;
+  color: var(--amber-deep, var(--amber));
+}
+@media (max-width: 560px) {
+  .details-unit {
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+  .details-unit-go {
+    display: none;
+  }
+}
+
+/* Планировка помещения: название комнаты и её площадь, снизу итог. */
+.details-rooms {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.details-room {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.65rem 0.9rem;
+  border-bottom: 1px solid var(--line);
+}
+.details-room:last-child {
+  border-bottom: none;
+}
+.details-room-name {
+  font-size: 0.9rem;
+  font-weight: 300;
+  color: var(--ink-2);
+}
+.details-room-area {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.details-room.total {
+  background: var(--paper-2);
+}
+.details-room.total .details-room-name,
+.details-room.total .details-room-area {
+  font-weight: 500;
+  color: var(--ink);
+}
+
 .details-close-btn {
   justify-content: center;
   width: 100%;
