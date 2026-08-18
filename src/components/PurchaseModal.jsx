@@ -193,9 +193,12 @@ export default function PurchaseModal({ property, onClose, onSuccess }) {
       if (err instanceof ApiError && err.status === 401) {
         setError('Сессия истекла — войдите заново по кнопке «Войти» вверху страницы')
       } else {
+        // Бэкенд объясняет свои отказы в problem.detail — показываем именно его. Когда detail нет
+        // (404 на несуществующий роут, 502, пустое тело), «попробуйте позже» отправляет человека
+        // ждать того, что само не починится, а нас — искать причину в коде. Поэтому называем код.
         setError(
           err instanceof ApiError
-            ? err.problem?.detail || 'Не удалось оформить заявку. Попробуйте позже'
+            ? err.problem?.detail || `Не удалось оформить заявку (ошибка ${err.status})`
             : 'Сеть недоступна. Попробуйте ещё раз',
         )
       }
