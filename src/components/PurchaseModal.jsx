@@ -305,11 +305,19 @@ export default function PurchaseModal({ property, onClose, onSuccess }) {
                     />
                   </svg>
                 </div>
-                <h2 className="reg-title display">Заявка создана</h2>
+                <h2 className="reg-title display">Заявка в списке на выпуск</h2>
                 <p className="reg-sub">
-                  Заявка на {fmtQty(calc.effectiveQty)} токенов «{property.name}» отправлена. Мы свяжемся с вами для
-                  подтверждения.
+                  Заявка на {fmtQty(calc.effectiveQty)} токенов «{property.name}» принята и встала в whitelist —
+                  список адресов, по которому мы формируем выпуск долей.
                 </p>
+                {/* Инвестор должен понимать, что дальше: между «купил» и «доли у меня» три шага,
+                    и первый из них уже пройден. Иначе тишина после нажатия читается как сбой. */}
+                <ol className="buy-next-steps">
+                  <li className="is-done">Заявка в whitelist</li>
+                  <li>Проверка и одобрение оператором</li>
+                  <li>Выпуск долей на ваш адрес</li>
+                </ol>
+                <p className="buy-next-note">Мы свяжемся с вами для подтверждения.</p>
                 <button className="btn btn-primary reg-submit" onClick={onClose}>
                   <span>Готово</span>
                   <span className="dot" />
