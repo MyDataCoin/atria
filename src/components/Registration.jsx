@@ -19,6 +19,10 @@ import DocModal from './DocModal.jsx'
 import { CONSENT_FORM } from '../content.consent.js'
 
 const EASE = [0.16, 1, 0.3, 1]
+
+// Опрос решения по KYC: раз в 5 секунд, не дольше пяти минут.
+const KYC_POLL_INTERVAL_MS = 5000
+const KYC_POLL_MAX_TICKS = 60
 const CODE_LENGTH = 6
 const RESEND_SECONDS = 30
 
@@ -176,6 +180,44 @@ export default function Registration({ mode, onClose, onSuccess }) {
       }
     }
   }, [isOpen, mode])
+
+  // Решение по проверке личности приходит вебхуком от провайдера и занимает минуты, а не
+  // секунды. Без опроса экран «ждём решение» так и остаётся ждать навсегда: решение давно
+  // пришло в базу, а человек видит старый ответ и вынужден перезагружать страницу, чтобы
+  // узнать об этом. Опрашиваем, пока экран открыт, и сами обновляем состояние.
+  useEffect(() => {
+    // Только там, где человеку показан итог ожидания, и только пока решения нет.
+    if (!isOpen || kycApproved || (step !== 5 && step !== 9)) return undefined
+
+    let alive = true
+    let ticks = 0
+    const id = setInterval(async () => {
+      // Провайдер редко думает дольше нескольких минут; после этого прекращаем — бесконечный
+      // фоновый опрос из открытой вкладки не приближает решение.
+      if (++ticks > KYC_POLL_MAX_TICKS) {
+        clearInterval(id)
+        return
+      }
+
+      const profile = await getKycStatus().catch(() => null)
+      if (!alive || !profile) return
+
+      if (profile.status === KycStatus.Approved) {
+        clearKycSubmitted()
+        setKycApproved(true)
+        clearInterval(id)
+      } else if (profile.status === KycStatus.Rejected) {
+        clearKycSubmitted()
+        setError(profile.rejectionReason || 'Проверка личности отклонена. Обратитесь в поддержку')
+        clearInterval(id)
+      }
+    }, KYC_POLL_INTERVAL_MS)
+
+    return () => {
+      alive = false
+      clearInterval(id)
+    }
+  }, [isOpen, step, kycApproved])
 
   // Сессия может отвалиться на любом шаге и в любой ручке, не только в KYC. Один общий
   // обработчик гарантирует, что человек всегда окажется на экране, где ЕСТЬ что нажать,
