@@ -1,14 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { createApplication } from '../lib/applications.js'
-import {
-  getKycStatus,
-  isKycApproved,
-  KycStatus,
-  wasKycSubmitted,
-  clearKycSubmitted,
-} from '../lib/kyc.js'
+import { getKycStatus, isKycApproved } from '../lib/kyc.js'
 import { ApiError, tokens } from '../lib/api.js'
+import { DASHBOARD_URL } from '../lib/dashboard.js'
 import Registration from './Registration.jsx'
 
 const EASE = [0.16, 1, 0.3, 1]
@@ -123,11 +118,7 @@ export default function PurchaseModal({ property, onClose, onSuccess }) {
   const [qty, setQty] = useState(SMALLEST_TOKEN)
   const [status, setStatus] = useState('idle') // idle | loading | done | error
   const [error, setError] = useState('')
-  // Гейт KYC: 'unknown' (ещё не знаем) | 'ok' | 'none' | 'review' | 'rejected'
-  const [kyc, setKyc] = useState('unknown')
-  const [kycReason, setKycReason] = useState('')
   const [showKyc, setShowKyc] = useState(false) // открыта ли модалка верификации
-  const [kycChecking, setKycChecking] = useState(false) // идёт ручная перепроверка статуса
 
   // Сброс при каждом открытии нового объекта.
   useEffect(() => {
@@ -138,55 +129,6 @@ export default function PurchaseModal({ property, onClose, onSuccess }) {
       setShowKyc(false)
     }
   }, [isOpen, maxQty])
-
-  // Разбор профиля в состояние гейта. Отметку «проверка сдана» снимаем, как только
-  // бэкенд отдал финальное решение, — дальше она только мешала бы.
-  const applyKyc = useCallback((p) => {
-    if (!p) {
-      clearKycSubmitted()
-      setKyc('none')
-    } else if (p.status === KycStatus.Approved) {
-      clearKycSubmitted()
-      setKyc('ok')
-    } else if (p.status === KycStatus.Rejected) {
-      clearKycSubmitted()
-      setKycReason(p.rejectionReason || '')
-      setKyc('rejected')
-    } else {
-      setKyc('review')
-    }
-  }, [])
-
-  // Статус KYC тянем сразу при открытии (и после закрытия модалки верификации),
-  // чтобы человек видел «нужно пройти KYC» до нажатия «Купить», а не после.
-  useEffect(() => {
-    if (!isOpen || showKyc) return
-    if (!tokens.isAuthed) {
-      setKyc('none')
-      return
-    }
-    let alive = true
-    getKycStatus()
-      .then((p) => alive && applyKyc(p))
-      .catch(() => alive && setKyc('unknown'))
-    return () => {
-      alive = false
-    }
-  }, [isOpen, showKyc, applyKyc])
-
-  // Ручная перепроверка: решение по KYC приходит вебхуком, и человеку нужен способ
-  // подтянуть его, не перезагружая страницу.
-  const recheckKyc = async () => {
-    if (kycChecking) return
-    setKycChecking(true)
-    try {
-      applyKyc(await getKycStatus())
-    } catch {
-      setError('Не удалось проверить статус. Попробуйте ещё раз')
-    } finally {
-      setKycChecking(false)
-    }
-  }
 
   // Блокируем прокрутку страницы и закрываем по Escape.
   useEffect(() => {
@@ -213,10 +155,6 @@ export default function PurchaseModal({ property, onClose, onSuccess }) {
 
   if (!property) return null
 
-  const kycBlocked = kyc === 'none' || kyc === 'review' || kyc === 'rejected'
-  // Проверку человек уже сдал, ждём вебхук: предлагать «пройти KYC» тут бессмысленно —
-  // бэкенд запрещает ресабмит, кнопка вела бы в тупик.
-  const awaitingKyc = kyc === 'review' && wasKycSubmitted()
   // Раньше здесь стоял Math.floor до целого токена. Доли делимы, поэтому округляем не до штуки,
   // а до масштаба доли — и всегда вниз, чтобы заявка не просила больше, чем человек ввёл.
   const clampQty = (v) => {
@@ -227,19 +165,22 @@ export default function PurchaseModal({ property, onClose, onSuccess }) {
   const priceLabel = `${fmtMoney(price)} ${currency}`.trim()
 
   const handleBuy = async () => {
+    // Без сессии открываем вход прямо здесь: та же модалка, что и для верификации, просто
+    // начинается с телефона. Отправлять человека искать кнопку в шапке — лишний шаг на ровном месте.
     if (!tokens.isAuthed) {
-      setStatus('error')
-      setError('Войдите в аккаунт, чтобы оформить покупку')
+      setShowKyc(true)
       return
     }
     setStatus('loading')
     setError('')
     try {
-      // Гейт по KYC: заявку можно оформлять только с подтверждённой личностью.
+      // Гейт по KYC — по свежему ответу базы, а не по тому, что экран прочитал при открытии:
+      // решение могло прийти вебхуком минуту назад. Не пройден — ведём проходить, а не
+      // упираем в текст: заявку бэкенд всё равно не примет без подтверждённой личности.
       const profile = await getKycStatus()
       if (!isKycApproved(profile)) {
         setStatus('idle')
-        applyKyc(profile)
+        setShowKyc(true)
         return
       }
       const app = await createApplication(property.id, calc.investment)
@@ -305,22 +246,19 @@ export default function PurchaseModal({ property, onClose, onSuccess }) {
                     />
                   </svg>
                 </div>
-                <h2 className="reg-title display">Заявка в списке на выпуск</h2>
+                <h2 className="reg-title display">Заявка принята</h2>
                 <p className="reg-sub">
-                  Заявка на {fmtQty(calc.effectiveQty)} токенов «{property.name}» принята и встала в whitelist —
-                  список адресов, по которому мы формируем выпуск долей.
+                  Заявка на {fmtQty(calc.effectiveQty)} токенов «{property.name}» принята и встала в очередь
+                  на выпуск долей. Статус заявки виден в личном кабинете.
                 </p>
-                {/* Инвестор должен понимать, что дальше: между «купил» и «доли у меня» три шага,
-                    и первый из них уже пройден. Иначе тишина после нажатия читается как сбой. */}
-                <ol className="buy-next-steps">
-                  <li className="is-done">Заявка в whitelist</li>
-                  <li>Проверка и одобрение оператором</li>
-                  <li>Выпуск долей на ваш адрес</li>
-                </ol>
-                <p className="buy-next-note">Мы свяжемся с вами для подтверждения.</p>
-                <button className="btn btn-primary reg-submit" onClick={onClose}>
-                  <span>Готово</span>
+                {/* Отслеживание живёт в дашборде, а не здесь: у главного сайта нет и не должно быть
+                    экрана «мои заявки», иначе он начинает дублировать кабинет и расходиться с ним. */}
+                <a className="btn btn-primary reg-submit" href={DASHBOARD_URL}>
+                  <span>Войти в дашборд</span>
                   <span className="dot" />
+                </a>
+                <button className="btn btn-ghost buy-done-close" onClick={onClose}>
+                  <span>Закрыть</span>
                 </button>
               </div>
             ) : (
@@ -410,55 +348,23 @@ export default function PurchaseModal({ property, onClose, onSuccess }) {
                   </div>
                 </div>
 
-                {kycBlocked && (
-                  <div className="buy-kyc-gate">
-                    <strong>{awaitingKyc ? 'Проверка на рассмотрении' : 'Для сделки нужно пройти KYC'}</strong>
-                    <p>
-                      {awaitingKyc
-                        ? 'Вы уже прошли проверку — ждём решение провайдера, обычно это несколько минут. Проходить её заново не нужно.'
-                        : kyc === 'review'
-                          ? 'Проверка личности не завершена. Закончите её — покупка станет доступна сразу после подтверждения.'
-                          : kyc === 'rejected'
-                            ? kycReason ||
-                              'Проверка личности отклонена. Пройдите KYC заново или обратитесь в поддержку.'
-                            : 'Покупка токенов доступна только верифицированным инвесторам. Пройдите KYC — это займёт пару минут.'}
-                    </p>
-                  </div>
-                )}
-
                 {error && <div className="reg-error">{error}</div>}
 
                 <div className="buy-actions">
                   <button type="button" className="btn btn-ghost" onClick={onClose}>
                     <span>Отмена</span>
                   </button>
-                  {awaitingKyc ? (
-                    // Проходить заново нечего — можно только подтянуть решение вебхука.
-                    <button
-                      type="button"
-                      className="btn btn-primary"
-                      onClick={recheckKyc}
-                      disabled={kycChecking}
-                    >
-                      <span>{kycChecking ? 'Проверяем…' : 'Проверить статус'}</span>
-                      <span className="dot" />
-                    </button>
-                  ) : kycBlocked ? (
-                    <button type="button" className="btn btn-primary" onClick={() => setShowKyc(true)}>
-                      <span>Пройти KYC</span>
-                      <span className="dot" />
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      className="btn btn-primary"
-                      onClick={handleBuy}
-                      disabled={status === 'loading'}
-                    >
-                      <span>{status === 'loading' ? 'Оформляем…' : 'Купить'}</span>
-                      <span className="dot" />
-                    </button>
-                  )}
+                  {/* Кнопка всегда одна — «Купить». Непройденный KYC не превращает экран покупки
+                      в экран статуса проверки: handleBuy сам уводит в верификацию, когда нужно. */}
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={handleBuy}
+                    disabled={status === 'loading'}
+                  >
+                    <span>{status === 'loading' ? 'Оформляем…' : 'Купить'}</span>
+                    <span className="dot" />
+                  </button>
                 </div>
               </>
             )}

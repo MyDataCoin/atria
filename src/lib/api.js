@@ -21,6 +21,7 @@ export const tokens = {
   },
   save({ accessToken, refreshToken, expiresAtUtc }) {
     if (accessToken) localStorage.setItem(ACCESS_KEY, accessToken)
+    if (accessToken) notifyAuthChanged()
     if (refreshToken) localStorage.setItem(REFRESH_KEY, refreshToken)
     // Бэкенд отдаёт срок жизни явно (AuthTokensDto.expiresAtUtc) — храним его, чтобы не
     // гадать по содержимому JWT. Без 'Z' Date разберёт строку как локальное время.
@@ -33,6 +34,7 @@ export const tokens = {
     localStorage.removeItem(ACCESS_KEY)
     localStorage.removeItem(REFRESH_KEY)
     localStorage.removeItem(EXPIRES_KEY)
+    notifyAuthChanged()
   },
   /** Протух ли access-токен. Без сохранённого срока считаем, что протух — пусть refresh решит. */
   get isAccessExpired() {
@@ -42,16 +44,17 @@ export const tokens = {
     return Number.isNaN(at) ? true : Date.now() + EXPIRY_SKEW_MS >= at
   },
   /**
-   * Есть ли ЖИВАЯ сессия: либо access ещё годен, либо его можно обновить по refresh-токену.
+   * Входил ли человек в аккаунт. Ответ обязательно приблизительный, и это не недосмотр:
+   * refresh-токен бэкенд кладёт в HttpOnly-куку, которую JS прочитать не может, поэтому
+   * «продлится ли сессия» здесь в принципе не вычисляется — это знает только сервер.
    *
-   * Раньше здесь стояла проверка «в localStorage лежит непустая строка», и протухший токен
-   * считался входом. Из-за этого через 15 минут после логина UI был уверен, что человек
-   * авторизован, вёл его сразу на KYC, там ловил 401 и писал «сначала войдите по номеру» —
-   * не давая при этом никакого способа войти. Живая сессия и наличие строки — разные вещи.
+   * Раньше тут стояло `!isAccessExpired || Boolean(tokens.refresh)`, и человек с живой кукой,
+   * но без копии токена в localStorage, читался как незалогиненный. Теперь наличие access-токена
+   * считается сессией, а мёртвая сессия обнаруживается на первом же запросе: apiFetch пробует
+   * обновление, не получается — токены стираются и срабатывает onSessionLost.
    */
   get isAuthed() {
-    if (!localStorage.getItem(ACCESS_KEY)) return false
-    return !tokens.isAccessExpired || Boolean(tokens.refresh)
+    return Boolean(localStorage.getItem(ACCESS_KEY))
   },
 }
 
@@ -75,6 +78,29 @@ let refreshInFlight = null
 /** Подписчики на потерю сессии — UI использует это, чтобы вернуть человека ко входу. */
 const sessionLostHandlers = new Set()
 
+/**
+ * Подписчики на смену состояния входа. Нужны потому, что войти можно из нескольких мест
+ * (шапка, модалка покупки), а шапка обязана показать «Дашборд» и «Выйти» сразу — не дожидаясь,
+ * пока закроют ту модалку, через которую человек вошёл, и не по перезагрузке страницы.
+ */
+const authChangedHandlers = new Set()
+
+function notifyAuthChanged() {
+  authChangedHandlers.forEach((h) => {
+    try {
+      h()
+    } catch {
+      /* один упавший обработчик не должен рвать остальным цепочку */
+    }
+  })
+}
+
+/** Подписаться на «вошли или вышли». Возвращает функцию отписки. */
+export function onAuthChange(handler) {
+  authChangedHandlers.add(handler)
+  return () => authChangedHandlers.delete(handler)
+}
+
 /** Подписаться на «сессия окончательно потеряна». Возвращает функцию отписки. */
 export function onSessionLost(handler) {
   sessionLostHandlers.add(handler)
@@ -94,6 +120,8 @@ async function refreshSession() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
+      // Токена в localStorage может не быть вовсе — тогда обновление идёт по куке,
+      // и бэкенд читает её ПЕРВОЙ (см. RefreshTokenCookie), а тело остаётся запасным путём.
       body: JSON.stringify({ refreshToken: tokens.refresh }),
     })
 
@@ -133,7 +161,7 @@ async function refreshSession() {
 export async function apiFetch(path, { method = 'GET', body, auth = false, headers = {} } = {}) {
   const isRefreshCall = path === REFRESH_PATH
 
-  if (auth && !isRefreshCall && tokens.access && tokens.isAccessExpired && tokens.refresh) {
+  if (auth && !isRefreshCall && tokens.access && tokens.isAccessExpired) {
     // Ошибку глушим: пусть запрос уйдёт со старым токеном и получит честный 401 ниже,
     // чем мы здесь развалимся с невнятным исключением.
     await refreshSession().catch(() => {})
@@ -162,7 +190,11 @@ export async function apiFetch(path, { method = 'GET', body, auth = false, heade
 
   let res = await send()
 
-  if (res.status === 401 && auth && !isRefreshCall && tokens.refresh) {
+  // Пробуем обновиться на любом 401 по auth-запросу, а не только когда refresh-токен лежит
+  // в localStorage: его там может не быть законно — он живёт в HttpOnly-куке. Условие
+  // `&& tokens.refresh` означало, что клиент отказывался даже ПОПРОБОВАТЬ обновиться, хотя
+  // куки хватило бы, и человек с истёкшим access-токеном просто упирался в мёртвый 401.
+  if (res.status === 401 && auth && !isRefreshCall && tokens.access) {
     try {
       await refreshSession()
       res = await send()

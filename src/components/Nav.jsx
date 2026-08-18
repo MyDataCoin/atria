@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useContent, useLang } from '../i18n.jsx'
 import Registration from './Registration.jsx'
-import { tokens, onSessionLost } from '../lib/api.js'
+import { tokens, onSessionLost, onAuthChange } from '../lib/api.js'
 import { logout } from '../lib/auth.js'
-import { getKycStatus, KycStatus, wasKycSubmitted, clearKycSubmitted } from '../lib/kyc.js'
+import { DASHBOARD_URL } from '../lib/dashboard.js'
 
 const EASE = [0.16, 1, 0.3, 1]
 
@@ -23,6 +23,11 @@ export default function Nav() {
   // Сессия могла умереть в любом фоновом запросе — сразу отражаем это в шапке.
   useEffect(() => onSessionLost(() => setAuthed(false)), [])
 
+  // Войти можно и не из шапки — например, из модалки покупки. Слушаем сам факт входа/выхода,
+  // а не закрытие своей модалки: иначе после регистрации через покупку шапка до перезагрузки
+  // продолжала звать регистрироваться.
+  useEffect(() => onAuthChange(() => setAuthed(tokens.isAuthed)), [])
+
   const handleLogout = () => {
     logout()
     setAuthed(false)
@@ -40,28 +45,6 @@ export default function Nav() {
     onScroll()
     window.addEventListener('scroll', onScroll, { passive: true })
     return () => window.removeEventListener('scroll', onScroll)
-  }, [])
-
-  // Возобновление KYC: если юзер авторизован, но проверку он бросил на полпути —
-  // при заходе на сайт сразу открываем модалку.
-  // Тому, кто проверку уже сдал и ждёт решения вебхука, модалку не показываем: раньше
-  // такого человека после пройденного KYC и привязанного кошелька снова гнали на «Пройдите KYC».
-  useEffect(() => {
-    if (!tokens.isAuthed) return
-    let alive = true
-    getKycStatus()
-      .then((p) => {
-        if (!alive) return
-        if (!p || p.status === KycStatus.Approved || p.status === KycStatus.Rejected) {
-          clearKycSubmitted()
-          return
-        }
-        if (!wasKycSubmitted()) setAuthMode('login')
-      })
-      .catch(() => {})
-    return () => {
-      alive = false
-    }
   }, [])
 
   // lock body scroll while the mobile menu is open, and auto-close on resize
@@ -123,17 +106,26 @@ export default function Nav() {
             <span className="sep">/</span>
             <span className={lang === 'kg' ? 'on' : ''}>{ui.langKg}</span>
           </button>
-          <button type="button" className="nav-cta magnetic" onClick={openRegister}>
-            {authed ? 'Продолжить' : nav.cta}
-          </button>
+          {/* Вошедшему регистрация не предлагается: его действия — кабинет и выход.
+              Гостю — зарегистрироваться или войти. */}
           {authed ? (
-            <button type="button" className="nav-cta magnetic login-btn" onClick={handleLogout}>
-              Выйти
-            </button>
+            <>
+              <a href={DASHBOARD_URL} className="nav-cta magnetic">
+                Дашборд
+              </a>
+              <button type="button" className="nav-cta magnetic login-btn" onClick={handleLogout}>
+                Выйти
+              </button>
+            </>
           ) : (
-            <button type="button" className="nav-cta magnetic login-btn" onClick={openLogin}>
-              Войти
-            </button>
+            <>
+              <button type="button" className="nav-cta magnetic" onClick={openRegister}>
+                {nav.cta}
+              </button>
+              <button type="button" className="nav-cta magnetic login-btn" onClick={openLogin}>
+                Войти
+              </button>
+            </>
           )}
         </div>
 
@@ -178,17 +170,24 @@ export default function Nav() {
                   <span className={lang === 'kg' ? 'on' : ''}>{ui.langKg}</span>
                 </button>
 
-                <button type="button" className="nav-cta" onClick={openRegister}>
-                  {authed ? 'Продолжить' : nav.cta}
-                </button>
                 {authed ? (
-                  <button type="button" className="nav-cta login-btn" onClick={handleLogout}>
-                    Выйти
-                  </button>
+                  <>
+                    <a href={DASHBOARD_URL} className="nav-cta" onClick={closeMenu}>
+                      Дашборд
+                    </a>
+                    <button type="button" className="nav-cta login-btn" onClick={handleLogout}>
+                      Выйти
+                    </button>
+                  </>
                 ) : (
-                  <button type="button" className="nav-cta login-btn" onClick={openLogin}>
-                    Войти
-                  </button>
+                  <>
+                    <button type="button" className="nav-cta" onClick={openRegister}>
+                      {nav.cta}
+                    </button>
+                    <button type="button" className="nav-cta login-btn" onClick={openLogin}>
+                      Войти
+                    </button>
+                  </>
                 )}
               </div>
             </motion.div>
