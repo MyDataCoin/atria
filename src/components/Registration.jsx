@@ -104,6 +104,9 @@ export default function Registration({ mode, onClose, onSuccess }) {
   const [resendIn, setResendIn] = useState(0)
   const [justResent, setJustResent] = useState(false)
   const [wallet, setWallet] = useState('') // адрес криптокошелька инвестора
+  // Одобрен ли KYC на самом деле. Итоговый экран показывается и тому, кто ещё ждёт решения,
+  // и заявлять там «личность подтверждена» было бы неправдой.
+  const [kycApproved, setKycApproved] = useState(false)
   const [consent, setConsent] = useState(false) // согласие на обработку ПДн (по умолчанию снято)
   const [showConsentDoc, setShowConsentDoc] = useState(false) // открыт ли текст согласия
 
@@ -122,6 +125,7 @@ export default function Registration({ mode, onClose, onSuccess }) {
       setResendIn(0)
       setJustResent(false)
       setWallet('')
+      setKycApproved(false)
       setConsent(false)
       setShowConsentDoc(false)
 
@@ -129,7 +133,8 @@ export default function Registration({ mode, onClose, onSuccess }) {
       // • нет живой сессии → телефон (шаг 1);
       // • авторизован (или dev-обход) → пропускаем телефон и ведём на KYC (шаг 4) —
       //   это же возобновляет прерванную проверку при повторном входе;
-      // • если KYC уже пройден (Approved) или сдан и ждёт решения вебхука → шаг 5 → кошелёк.
+      // • KYC пройден или сдан и ждёт решения → шаг 5 → кошелёк;
+      // • кошелёк уже привязан → шагов про кошелёк нет вовсе, сразу итог (шаг 9).
       if (KYC_ONLY_DEV || tokens.isAuthed) {
         setStep(4)
         if (tokens.isAuthed) {
@@ -139,15 +144,20 @@ export default function Registration({ mode, onClose, onSuccess }) {
                 clearKycSubmitted() // профиля нет — старая отметка протухла
                 return
               }
+              // Кошелёк спрашивают ОДИН раз. Раньше профиль не отдавал привязанный адрес, и
+              // модалка не могла отличить «кошелька нет» от «кошелёк давно привязан» — поэтому
+              // требовала его снова у человека, который его уже вписал.
+              const hasWallet = Boolean(p.walletAddress)
+              setKycApproved(p.status === KycStatus.Approved)
               if (p.status === KycStatus.Approved) {
                 clearKycSubmitted()
-                setStep(5)
+                setStep(hasWallet ? 9 : 5)
               } else if (p.status === KycStatus.Rejected) {
                 clearKycSubmitted()
               } else if (wasKycSubmitted()) {
                 // Проверку человек уже прошёл, решение ещё не доехало — не заставляем
                 // проходить её заново, ведём к последнему шагу с кошельком.
-                setStep(5)
+                setStep(hasWallet ? 9 : 5)
               }
             })
             .catch((err) => {
@@ -377,21 +387,24 @@ export default function Registration({ mode, onClose, onSuccess }) {
         return
       }
       // Показываем экран «проверка пройдена» с кнопкой «Следующий этап» → кошелёк.
-      setStep(5)
+      // Если кошелёк уже привязан, шага про кошелёк нет — сразу итог.
+      setKycApproved(decided?.status === KycStatus.Approved)
+      setStep(decided?.walletAddress ? 9 : 5)
     } catch (err) {
       if (err instanceof ApiError && err.status === 400) {
         // KYC уже пройден/начат — смотрим реальный статус профиля.
         const profile = await getKycStatus().catch(() => null)
         if (profile?.status === KycStatus.Approved) {
           clearKycSubmitted()
-          setStep(5) // верифицирован → «Следующий этап» → кошелёк
+          setKycApproved(true)
+          setStep(profile.walletAddress ? 9 : 5) // верифицирован → кошелёк, если его ещё нет
         } else if (profile?.status === KycStatus.Rejected) {
           clearKycSubmitted()
           setError(profile.rejectionReason || 'Проверка личности отклонена. Обратитесь в поддержку')
         } else if (profile && wasKycSubmitted()) {
           // Свою часть человек уже сделал, ждём только вебхук — не гоняем его по кругу,
-          // ведём дальше к кошельку.
-          setStep(5)
+          // ведём дальше к кошельку (или сразу к итогу, если кошелёк уже привязан).
+          setStep(profile.walletAddress ? 9 : 5)
         } else if (profile) {
           // UnderReview/Pending: сессия открыта, но не завершена. Пересоздать её фронт не может
           // (бэкенд запрещает ресабмит и не отдаёт verificationUrl) — нужна доработка бэка.
@@ -859,8 +872,14 @@ export default function Registration({ mode, onClose, onSuccess }) {
                       <path d="M4 12.5L9.5 18L20 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
                     </svg>
                   </div>
-                  <h2 className="reg-title display">Вы успешно прошли регистрацию</h2>
-                  <p className="reg-sub">Личность подтверждена, кошелёк привязан — можно инвестировать</p>
+                  <h2 className="reg-title display">
+                    {kycApproved ? 'Вы успешно прошли регистрацию' : 'Регистрация завершена'}
+                  </h2>
+                  <p className="reg-sub">
+                    {kycApproved
+                      ? 'Личность подтверждена, кошелёк привязан — можно инвестировать'
+                      : 'Кошелёк привязан. Ждём решение по проверке личности — обычно это несколько минут'}
+                  </p>
                   <button className="btn btn-primary reg-submit" onClick={onClose}>
                     <span>Готово</span>
                     <span className="dot" />
