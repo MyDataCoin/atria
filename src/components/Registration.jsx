@@ -392,11 +392,17 @@ export default function Registration({ mode, onClose, onSuccess }) {
     setError('')
     try {
       // Сначала фиксируем согласие (кто/когда/версия), потом отправляем ПДн в обработку.
-      // Ручки /consent на бэке пока нет — не блокируем флоу, но логируем (бэкенд должен её добавить и enforce'ить).
+      // Блокирующе: без сохранённой записи согласия у нас нет доказательства законного основания
+      // обработки, а чекбокс сам по себе им не является. Ошибку показываем человеку, а не глушим
+      // в консоль — иначе паспортные данные уходят в Didit при неподтверждённом согласии.
       try {
         await postConsent()
       } catch (e) {
-        console.warn('postConsent failed (нужен эндпоинт /consent на бэке):', e?.status, e?.problem || e)
+        // В лог — только статус: тело ProblemDetails может содержать эхо переданных полей (ПДн).
+        console.warn('postConsent failed:', e?.status)
+        setError('Не удалось зафиксировать согласие на обработку данных. Попробуйте ещё раз')
+        setLoading(false)
+        return
       }
       const { verificationUrl } = await submitKyc()
       if (!verificationUrl) {
@@ -487,8 +493,9 @@ export default function Registration({ mode, onClose, onSuccess }) {
     try {
       await attachWallet(wallet)
     } catch (err) {
-      // Пока бэкенд не добавил ручку привязки — не блокируем флоу, но логируем.
-      console.warn('attachWallet failed (нужен эндпоинт на бэке):', err?.status, err?.problem || err)
+      // Не блокируем флоу: кошелёк можно привязать позже из кабинета. В лог — только статус,
+      // тело ProblemDetails может содержать эхо отправленных полей.
+      console.warn('attachWallet failed:', err?.status)
     } finally {
       setLoading(false)
     }

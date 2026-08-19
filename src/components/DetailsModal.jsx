@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { isDraft } from '../lib/properties.js'
+import { safeUrl } from '../lib/safeUrl.js'
 
 const EASE = [0.16, 1, 0.3, 1]
 
@@ -67,10 +68,15 @@ export default function DetailsModal({ property, onClose, isBuilding = false, on
 
   const data = useMemo(() => {
     if (!property) return null
-    const images = (Array.isArray(property.images) ? property.images : []).filter((x) => x?.url)
-    const documents = (Array.isArray(property.documents) ? property.documents : []).filter(
-      (x) => x?.url,
-    )
+    // Схему проверяем ЗДЕСЬ, а не при отрисовке: и картинка, и документ приходят из API, а
+    // `javascript:`/`data:` в href React пропустит как есть. Ссылка с неподдерживаемой схемой
+    // просто не показывается — лучше отсутствующий документ, чем исполняемая ссылка.
+    const images = (Array.isArray(property.images) ? property.images : [])
+      .map((x) => ({ ...x, url: safeUrl(x?.url) }))
+      .filter((x) => x.url)
+    const documents = (Array.isArray(property.documents) ? property.documents : [])
+      .map((x) => ({ ...x, url: safeUrl(x?.url) }))
+      .filter((x) => x.url)
     const currency = property.currency || ''
     const total = Number(property.totalTokens) || 0
     const available = Number(property.availableTokens ?? total) || 0

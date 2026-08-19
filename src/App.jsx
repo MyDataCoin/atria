@@ -17,6 +17,7 @@ import TrustLegal from './sections/TrustLegal.jsx'
 import Risks from './sections/Risks.jsx'
 import Faq from './sections/Faq.jsx'
 import FinalCta from './sections/FinalCta.jsx'
+import Contact from './sections/Contact.jsx'
 
 function Site() {
   useSmoothScroll()
@@ -37,6 +38,7 @@ function Site() {
         <Risks />
         <Faq />
         <FinalCta />
+        <Contact />
       </main>
       <Footer />
       <ToTop />

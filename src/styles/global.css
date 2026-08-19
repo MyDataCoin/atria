@@ -4263,3 +4263,138 @@ body::after {
     text-align: left;
   }
 }
+/* ---------- Обратная связь (секция #contact) ---------- */
+.contact-grid {
+  display: grid;
+  grid-template-columns: 0.9fr 1.1fr;
+  gap: clamp(2rem, 5vw, 4.5rem);
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .contact-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.contact-rail {
+  position: sticky;
+  top: 100px;
+}
+@media (max-width: 900px) {
+  .contact-rail {
+    position: static;
+  }
+}
+.contact-points {
+  list-style: none;
+  margin: 1.6rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+.contact-points li {
+  position: relative;
+  padding-left: 1.1rem;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--ink-2, var(--ink));
+}
+.contact-points li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.62em;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--amber);
+}
+.contact-card {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: clamp(1.4rem, 3vw, 2.2rem);
+}
+.contact-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+}
+/* Текстовое поле повторяет инпуты формы регистрации, чтобы карточка не выглядела чужой. */
+.contact-form textarea {
+  width: 100%;
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  line-height: 1.5;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 1em;
+  outline: none;
+  resize: vertical;
+  min-height: 130px;
+  transition: border-color 0.3s var(--ease), background 0.3s var(--ease);
+}
+.contact-form textarea:focus {
+  border-color: var(--amber);
+  background: var(--paper-2);
+}
+.contact-hint {
+  font-size: 0.78rem;
+  color: var(--ink-3);
+}
+.contact-submit {
+  width: 100%;
+  justify-content: center;
+}
+.contact-submit:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.contact-note {
+  font-size: 0.76rem;
+  line-height: 1.5;
+  color: var(--ink-3);
+  margin: 0;
+}
+.contact-done {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.9rem;
+  padding: 1rem 0;
+}
+.contact-done-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--amber) 18%, transparent);
+  color: var(--amber-deep, var(--amber));
+  font-size: 1.2rem;
+}
+.contact-done h3 {
+  font-family: var(--font-display, var(--font-sans));
+  font-size: 1.3rem;
+  margin: 0;
+}
+.contact-done p {
+  margin: 0;
+  color: var(--ink-2, var(--ink));
+  line-height: 1.6;
+}
+
+/* Почта и телефон стоят рядом: оба обязательны, и пара в один ряд читается как один контакт. */
+.contact-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+@media (max-width: 560px) {
+  .contact-pair {
+    grid-template-columns: 1fr;
+  }
+}

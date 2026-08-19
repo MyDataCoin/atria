@@ -20,7 +20,7 @@ export default function Faq() {
           </h2>
           <p className="s-sub">{c.subhead}</p>
           <a
-            href="#cta"
+            href="#contact"
             className="tlink"
             style={{
               fontFamily: 'var(--font-mono)',

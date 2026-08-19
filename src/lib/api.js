@@ -5,24 +5,34 @@
 const BASE_URL = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '')
 
 const ACCESS_KEY = 'atria.accessToken'
-const REFRESH_KEY = 'atria.refreshToken'
 const EXPIRES_KEY = 'atria.accessExpiresAt'
+
+// Ключ, под которым refresh-токен хранился раньше. Оставлен ТОЛЬКО чтобы вычистить его у тех,
+// кто успел залогиниться до этой правки: долгоживущий токен обновления не должен лежать там,
+// где его прочитает любой скрипт, исполнившийся на atria.kg.
+const LEGACY_REFRESH_KEY = 'atria.refreshToken'
 
 // Access-токен живёт 15 минут (Jwt:AccessTokenMinutes). Обновляем чуть заранее, чтобы
 // запрос не улетел с токеном, который протухнет по дороге.
 const EXPIRY_SKEW_MS = 30_000
 
+// Разовая уборка: у всех, кто входил до этой правки, в localStorage лежит refresh-токен.
+localStorage.removeItem(LEGACY_REFRESH_KEY)
+
 export const tokens = {
   get access() {
     return localStorage.getItem(ACCESS_KEY) || null
   },
-  get refresh() {
-    return localStorage.getItem(REFRESH_KEY) || null
-  },
-  save({ accessToken, refreshToken, expiresAtUtc }) {
+  /**
+   * Сохранить выданную пару. Refresh-токен из ответа НЕ сохраняется: бэкенд кладёт его в
+   * HttpOnly-куку `.atria.kg` (см. RefreshTokenCookie), недоступную JS, — а копия в localStorage
+   * ровно это и обнуляла: любой скрипт на странице (скомпрометированная зависимость, сторонний
+   * виджет, `javascript:`-ссылка) мог унести бесконечно продлеваемую сессию на чужой сервер.
+   * Ротация тут не спасает — атакующий просто обновляется первым.
+   */
+  save({ accessToken, expiresAtUtc }) {
     if (accessToken) localStorage.setItem(ACCESS_KEY, accessToken)
     if (accessToken) notifyAuthChanged()
-    if (refreshToken) localStorage.setItem(REFRESH_KEY, refreshToken)
     // Бэкенд отдаёт срок жизни явно (AuthTokensDto.expiresAtUtc) — храним его, чтобы не
     // гадать по содержимому JWT. Без 'Z' Date разберёт строку как локальное время.
     if (expiresAtUtc) {
@@ -32,7 +42,7 @@ export const tokens = {
   },
   clear() {
     localStorage.removeItem(ACCESS_KEY)
-    localStorage.removeItem(REFRESH_KEY)
+    localStorage.removeItem(LEGACY_REFRESH_KEY)
     localStorage.removeItem(EXPIRES_KEY)
     notifyAuthChanged()
   },
@@ -48,7 +58,7 @@ export const tokens = {
    * refresh-токен бэкенд кладёт в HttpOnly-куку, которую JS прочитать не может, поэтому
    * «продлится ли сессия» здесь в принципе не вычисляется — это знает только сервер.
    *
-   * Раньше тут стояло `!isAccessExpired || Boolean(tokens.refresh)`, и человек с живой кукой,
+   * Раньше тут стояло `!isAccessExpired || Boolean(<refresh из localStorage>)`, и человек с живой кукой,
    * но без копии токена в localStorage, читался как незалогиненный. Теперь наличие access-токена
    * считается сессией, а мёртвая сессия обнаруживается на первом же запросе: apiFetch пробует
    * обновление, не получается — токены стираются и срабатывает onSessionLost.
@@ -108,8 +118,9 @@ export function onSessionLost(handler) {
 }
 
 /**
- * Обновить сессию по refresh-токену. Токен уходит и в теле, и куки летят сами
- * (бэкенд кладёт refresh в HttpOnly-куку и читает её первой — см. RefreshTokenCookie).
+ * Обновить сессию. Токен обновления живёт только в HttpOnly-куке, которую браузер отправляет
+ * сам при `credentials: 'include'`; в теле его больше нет и на клиенте его копии не существует
+ * (см. `tokens.save`). Бэкенд и так читает куку ПЕРВОЙ — см. RefreshTokenCookie.
  *
  * Если обновиться не удалось, токены стираются: держать мёртвую сессию в localStorage —
  * это ровно тот случай, когда UI считает человека вошедшим, а API отвечает 401.
@@ -120,9 +131,8 @@ async function refreshSession() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      // Токена в localStorage может не быть вовсе — тогда обновление идёт по куке,
-      // и бэкенд читает её ПЕРВОЙ (см. RefreshTokenCookie), а тело остаётся запасным путём.
-      body: JSON.stringify({ refreshToken: tokens.refresh }),
+      // Пустое тело: обновление идёт исключительно по HttpOnly-куке.
+      body: JSON.stringify({}),
     })
 
     if (!res.ok) throw new ApiError('Не удалось обновить сессию', res.status, null)
