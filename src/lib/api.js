@@ -19,6 +19,16 @@ const EXPIRY_SKEW_MS = 30_000
 // Разовая уборка: у всех, кто входил до этой правки, в localStorage лежит refresh-токен.
 localStorage.removeItem(LEGACY_REFRESH_KEY)
 
+/**
+ * Метка «выход сделан в другом приложении».
+ *
+ * Кабинет живёт на app.atria.kg и отозвать сессию на сервере может, а вот стереть access-токен
+ * ЗДЕСЬ — нет: localStorage у каждого origin свой. Без сигнала сайт ещё до четверти часа рисовал бы
+ * «Дашборд» и «Выйти» человеку, который уже вышел, — пока не протухнет access-токен. Поэтому кабинет
+ * уводит на главную с этим параметром, а мы по нему дочищаем локальную сторону.
+ */
+const SIGNED_OUT_PARAM = 'signed-out'
+
 export const tokens = {
   get access() {
     return localStorage.getItem(ACCESS_KEY) || null
@@ -349,5 +359,17 @@ function safeJson(text) {
     return JSON.parse(text)
   } catch {
     return text
+  }
+}
+
+// Выход, сделанный в кабинете (app.atria.kg), доводится до конца здесь: сессию на сервере кабинет
+// уже отозвал, но access-токен в localStorage — отдельный для каждого origin, и стереть его может
+// только сам сайт. Метку снимаем из адреса сразу, чтобы она не осталась в ссылке, которой поделятся.
+if (typeof window !== 'undefined') {
+  const url = new URL(window.location.href)
+  if (url.searchParams.has(SIGNED_OUT_PARAM)) {
+    tokens.clear()
+    url.searchParams.delete(SIGNED_OUT_PARAM)
+    window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`)
   }
 }
