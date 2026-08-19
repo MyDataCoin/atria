@@ -9,19 +9,23 @@ import { submitFeedback, feedbackErrorText } from '../lib/feedback.js'
 
 const EASE = [0.16, 1, 0.3, 1]
 
-// Те же грубые проверки, что и на сервере. Строгие маски отсекают живых людей с непривычным
-// форматом записи, а точность здесь не нужна — отвечает всё равно человек.
+// Проверка почты намеренно грубая — как и на сервере: строгая маска отсекает живых людей
+// с непривычным адресом, а точность здесь не нужна.
 function emailLooksUsable(value) {
   const v = (value || '').trim()
   const at = v.indexOf('@')
   return at > 0 && at < v.length - 1 && v.indexOf('.', at) > at + 1 && !v.includes(' ')
 }
 
-function phoneLooksUsable(value) {
-  const v = (value || '').trim()
-  const digits = (v.match(/\d/g) || []).length
-  return digits >= 9 && /^[\d+()\-\s]+$/.test(v)
+// Телефон вводится как в форме регистрации: +996 в поле уже стоит, человек набирает
+// девять своих цифр. Маска не даёт ни стереть код страны, ни набрать десятую цифру.
+function formatPhone(raw) {
+  const digits = raw.replace(/\D/g, '').replace(/^996/, '').slice(0, 9)
+  const parts = [digits.slice(0, 3), digits.slice(3, 6), digits.slice(6, 9)].filter(Boolean)
+  return parts.length ? `+996 ${parts.join(' ')}` : '+996 '
 }
+
+const phoneDigits = (formatted) => formatted.replace(/\D/g, '').replace(/^996/, '')
 
 /**
  * Форма обратной связи: имя, способ связи и вопрос. Отправляется анонимно (POST /feedback),
@@ -31,7 +35,10 @@ export default function Contact() {
   const c = useContent().contact
   const { lang } = useLang()
 
-  const [form, setForm] = useState({ fullName: '', email: '', phone: '', message: '' })
+  const [form, setForm] = useState({ fullName: '', email: '', phone: '+996 ', message: '' })
+  // Поля, которые человек уже трогал: подсказку об ошибке показываем только по ним, а не
+  // подсвечиваем красным форму, к которой ещё не притрагивались.
+  const [touched, setTouched] = useState({})
   const [consent, setConsent] = useState(false)
   const [showConsentDoc, setShowConsentDoc] = useState(false)
   const [sending, setSending] = useState(false)
@@ -40,26 +47,39 @@ export default function Contact() {
 
   const set = (key) => (e) => {
     setError('')
-    setForm((f) => ({ ...f, [key]: e.target.value }))
+    const value = key === 'phone' ? formatPhone(e.target.value) : e.target.value
+    setForm((f) => ({ ...f, [key]: value }))
   }
 
-  const canSubmit =
-    form.fullName.trim().length > 1 &&
-    emailLooksUsable(form.email) &&
-    phoneLooksUsable(form.phone) &&
-    form.message.trim().length > 4 &&
-    consent &&
-    !sending
+  const markTouched = (key) => () => setTouched((t) => ({ ...t, [key]: true }))
+
+  // Что именно не так с каждым полем. Одно место на форму: по нему и блокируется отправка,
+  // и рисуются подсказки, поэтому «кнопка серая, а почему — непонятно» не получается.
+  const problems = {
+    fullName: form.fullName.trim().length > 1 ? '' : c.errors.name,
+    email: emailLooksUsable(form.email) ? '' : c.errors.email,
+    phone: phoneDigits(form.phone).length === 9 ? '' : c.errors.phone,
+    message: form.message.trim().length > 4 ? '' : c.errors.message,
+  }
+  const firstProblem = Object.values(problems).find(Boolean) || ''
+
+  const canSubmit = !firstProblem && consent && !sending
 
   const onSubmit = async (e) => {
     e.preventDefault()
-    if (!canSubmit) return
+    if (!canSubmit) {
+      // Форма не уходит наполовину заполненной, но и молчать нельзя: показываем, чего не хватает.
+      setTouched({ fullName: true, email: true, phone: true, message: true })
+      setError(firstProblem || (consent ? '' : c.errors.consent))
+      return
+    }
     setSending(true)
     setError('')
     try {
       await submitFeedback(form)
       setSent(true)
-      setForm({ fullName: '', email: '', phone: '', message: '' })
+      setForm({ fullName: '', email: '', phone: '+996 ', message: '' })
+      setTouched({})
       setConsent(false)
     } catch (err) {
       setError(feedbackErrorText(err, lang))
@@ -107,10 +127,15 @@ export default function Contact() {
                   type="text"
                   value={form.fullName}
                   onChange={set('fullName')}
+                  onBlur={markTouched('fullName')}
                   placeholder={c.fields.namePlaceholder}
                   maxLength={256}
                   autoComplete="name"
+                  aria-invalid={touched.fullName && !!problems.fullName}
                 />
+                {touched.fullName && problems.fullName && (
+                  <span className="contact-invalid">{problems.fullName}</span>
+                )}
               </label>
 
               <div className="contact-pair">
@@ -120,24 +145,34 @@ export default function Contact() {
                     type="text"
                     value={form.email}
                     onChange={set('email')}
+                    onBlur={markTouched('email')}
                     placeholder={c.fields.emailPlaceholder}
                     maxLength={256}
                     autoComplete="email"
                     inputMode="email"
+                    aria-invalid={touched.email && !!problems.email}
                   />
+                  {touched.email && problems.email && (
+                    <span className="contact-invalid">{problems.email}</span>
+                  )}
                 </label>
 
                 <label className="reg-field">
                   <span className="reg-label mono">{c.fields.phone}</span>
                   <input
-                    type="text"
+                    type="tel"
                     value={form.phone}
                     onChange={set('phone')}
+                    onBlur={markTouched('phone')}
                     placeholder={c.fields.phonePlaceholder}
-                    maxLength={32}
+                    maxLength={18}
                     autoComplete="tel"
-                    inputMode="tel"
+                    inputMode="numeric"
+                    aria-invalid={touched.phone && !!problems.phone}
                   />
+                  {touched.phone && problems.phone && (
+                    <span className="contact-invalid">{problems.phone}</span>
+                  )}
                 </label>
               </div>
               <span className="contact-hint">{c.fields.contactHint}</span>
@@ -147,10 +182,15 @@ export default function Contact() {
                 <textarea
                   value={form.message}
                   onChange={set('message')}
+                  onBlur={markTouched('message')}
                   placeholder={c.fields.messagePlaceholder}
                   rows={5}
                   maxLength={4000}
+                  aria-invalid={touched.message && !!problems.message}
                 />
+                {touched.message && problems.message && (
+                  <span className="contact-invalid">{problems.message}</span>
+                )}
               </label>
 
               <label className="reg-consent">
@@ -177,7 +217,9 @@ export default function Contact() {
 
               {error && <div className="reg-error">{error}</div>}
 
-              <button type="submit" className="btn btn-primary contact-submit" disabled={!canSubmit}>
+              {/* Кнопка не блокируется: нажатие по неполной форме показывает, какого поля не хватает,
+                  а серая кнопка без объяснения оставляет человека гадать. */}
+              <button type="submit" className="btn btn-primary contact-submit" disabled={sending}>
                 <span className="dot" />
                 <span>{sending ? c.sending : c.submit}</span>
               </button>

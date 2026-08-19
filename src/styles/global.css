@@ -4398,3 +4398,13 @@ body::after {
     grid-template-columns: 1fr;
   }
 }
+
+/* Подсказка под полем формы обратной связи: что именно мешает отправить. */
+.contact-invalid {
+  font-size: 0.76rem;
+  color: #b3432f;
+}
+.contact-form input[aria-invalid='true'],
+.contact-form textarea[aria-invalid='true'] {
+  border-color: #b3432f;
+}
