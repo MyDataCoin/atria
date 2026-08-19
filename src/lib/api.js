@@ -39,11 +39,13 @@ export const tokens = {
       const iso = /([Zz]|[+-]\d{2}:?\d{2})$/.test(expiresAtUtc) ? expiresAtUtc : `${expiresAtUtc}Z`
       localStorage.setItem(EXPIRES_KEY, iso)
     }
+    scheduleProactiveRefresh()
   },
   clear() {
     localStorage.removeItem(ACCESS_KEY)
     localStorage.removeItem(LEGACY_REFRESH_KEY)
     localStorage.removeItem(EXPIRES_KEY)
+    cancelProactiveRefresh()
     notifyAuthChanged()
   },
   /** Протух ли access-токен. Без сохранённого срока считаем, что протух — пусть refresh решит. */
@@ -117,48 +119,160 @@ export function onSessionLost(handler) {
   return () => sessionLostHandlers.delete(handler)
 }
 
+/** Ошибка «сессии больше нет»: сервер отказал самому refresh-токену (401/403). */
+export class SessionExpiredError extends ApiError {
+  constructor(status, problem) {
+    super('Сессия истекла — войдите снова', status, problem)
+    this.name = 'SessionExpiredError'
+  }
+}
+
+/**
+ * Ошибка «обновиться сейчас не вышло»: сеть отвалилась, бэкенд перезапускается, шлюз отдал 502.
+ * Сессия при этом НЕ трогается — именно смешение этих двух случаев и приводило к тому, что
+ * секунда без интернета стоила человеку полного повторного входа.
+ */
+export class RefreshUnavailableError extends ApiError {
+  constructor(cause) {
+    super('Не удалось обновить сессию — проблема со связью', 0, null)
+    this.name = 'RefreshUnavailableError'
+    this.cause = cause
+  }
+}
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
+// Пара повторов перед тем, как признать обновление неудачным: одна неудачная попытка — это ещё
+// не приговор сессии.
+const REFRESH_RETRY_DELAYS_MS = [400, 1200]
+
+// Таймер, который обновляет токен ЗАРАНЕЕ, а не после первого 401.
+let proactiveTimer = null
+
+function cancelProactiveRefresh() {
+  if (proactiveTimer) clearTimeout(proactiveTimer)
+  proactiveTimer = null
+}
+
+/**
+ * Планирует обновление за EXPIRY_SKEW_MS до конца жизни access-токена.
+ *
+ * Без него сессия продлевалась только «по факту 401»: каждые пятнадцать минут первые запросы
+ * падали и переигрывались, а запрос, который переиграть нельзя (отправка формы, загрузка файла),
+ * просто терялся. Открытая на весь день вкладка — это та же история десятки раз.
+ */
+function scheduleProactiveRefresh() {
+  cancelProactiveRefresh()
+  const raw = localStorage.getItem(EXPIRES_KEY)
+  if (!tokens.access || !raw) return
+
+  const at = Date.parse(raw)
+  if (Number.isNaN(at)) return
+
+  // Не раньше чем через пару секунд: часы сервера могут идти вперёд, и цикл бы закрутился.
+  proactiveTimer = setTimeout(
+    () => {
+      refreshSession().catch(() => {})
+    },
+    Math.max(at - Date.now() - EXPIRY_SKEW_MS, 5_000),
+  )
+}
+
 /**
  * Обновить сессию. Токен обновления живёт только в HttpOnly-куке, которую браузер отправляет
  * сам при `credentials: 'include'`; в теле его больше нет и на клиенте его копии не существует
  * (см. `tokens.save`). Бэкенд и так читает куку ПЕРВОЙ — см. RefreshTokenCookie.
  *
- * Если обновиться не удалось, токены стираются: держать мёртвую сессию в localStorage —
- * это ровно тот случай, когда UI считает человека вошедшим, а API отвечает 401.
+ * Сессия стирается ТОЛЬКО когда сервер отказал токену (401/403). Раньше её стирала любая ошибка,
+ * включая обрыв связи, — и человека выбрасывало на вход из-за одного неудачного запроса.
  */
 async function refreshSession() {
   refreshInFlight ??= (async () => {
-    const res = await fetch(`${BASE_URL}/api/v1${REFRESH_PATH}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      // Пустое тело: обновление идёт исключительно по HttpOnly-куке.
-      body: JSON.stringify({}),
-    })
+    let lastError = null
 
-    if (!res.ok) throw new ApiError('Не удалось обновить сессию', res.status, null)
+    for (let attempt = 0; attempt <= REFRESH_RETRY_DELAYS_MS.length; attempt += 1) {
+      if (attempt > 0) await sleep(REFRESH_RETRY_DELAYS_MS[attempt - 1])
 
-    const data = safeJson(await res.text())
-    if (!data?.accessToken) throw new ApiError('Ответ обновления без токена', res.status, data)
+      let res
+      try {
+        res = await fetch(`${BASE_URL}/api/v1${REFRESH_PATH}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          // Пустое тело: обновление идёт исключительно по HttpOnly-куке.
+          body: JSON.stringify({}),
+        })
+      } catch (networkErr) {
+        lastError = networkErr
+        continue
+      }
 
-    tokens.save(data)
-    return data
+      if (res.status === 401 || res.status === 403) {
+        throw new SessionExpiredError(res.status, safeJson(await res.text()))
+      }
+
+      if (!res.ok) {
+        lastError = new ApiError('Не удалось обновить сессию', res.status, null)
+        continue
+      }
+
+      const data = safeJson(await res.text())
+      if (!data?.accessToken) {
+        lastError = new ApiError('Ответ обновления без токена', res.status, data)
+        continue
+      }
+
+      tokens.save(data)
+      return data
+    }
+
+    throw new RefreshUnavailableError(lastError)
   })()
 
   try {
     return await refreshInFlight
   } catch (err) {
-    tokens.clear()
-    sessionLostHandlers.forEach((h) => {
-      try {
-        h()
-      } catch {
-        /* один упавший обработчик не должен рвать остальным цепочку */
-      }
-    })
+    // Сессия окончена — чистим и говорим об этом UI. Временный сбой сессию не трогает: следующий
+    // запрос (или возврат во вкладку) попробует снова.
+    if (err instanceof SessionExpiredError) {
+      tokens.clear()
+      sessionLostHandlers.forEach((h) => {
+        try {
+          h()
+        } catch {
+          /* один упавший обработчик не должен рвать остальным цепочку */
+        }
+      })
+    }
     throw err
   } finally {
     refreshInFlight = null
   }
+}
+
+// Возвращение во вкладку и восстановление сети — два момента, когда сессия чаще всего выглядит
+// «слетевшей»: в фоновых вкладках браузер тормозит таймеры, и плановое обновление могло не сработать.
+if (typeof document !== 'undefined') {
+  const renewIfStale = () => {
+    if (tokens.access && tokens.isAccessExpired) refreshSession().catch(() => {})
+  }
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') renewIfStale()
+  })
+  window.addEventListener('online', renewIfStale)
+
+  // Вход или выход в соседней вкладке того же домена: localStorage шлёт событие, и шапка здесь
+  // обязана перестроиться — иначе одна вкладка показывает «Дашборд», а вторая «Войти».
+  window.addEventListener('storage', (event) => {
+    if (event.key === ACCESS_KEY || event.key === null) {
+      scheduleProactiveRefresh()
+      notifyAuthChanged()
+    }
+  })
+
+  // Стартовое расписание: вкладку могли открыть с уже сохранённым токеном.
+  scheduleProactiveRefresh()
 }
 
 /**

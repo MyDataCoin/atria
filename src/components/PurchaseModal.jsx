@@ -60,6 +60,21 @@ const floorToScale = (n) => {
   return Math.floor(Math.round(scaled * 1e6) / 1e6) / 10 ** TOKEN_SCALE
 }
 
+/**
+ * Разбор суммы, введённой человеком: «1 200,50», «1200.5», «500 сом» — всё это одно число.
+ *
+ * Пробелы (в том числе неразрывные, которые вставляет форматирование) убираем, запятую приводим к
+ * точке: на русской раскладке дробную часть отделяют именно запятой, и поле, которое её не понимает,
+ * читается как сломанное.
+ */
+const parseAmount = (raw) => {
+  const normalized = String(raw ?? '')
+    .replace(/[\s\u00a0\u202f]/g, '')
+    .replace(',', '.')
+    .replace(/[^\d.]/g, '')
+  return normalized === '' ? NaN : Number(normalized)
+}
+
 /** Деньги существуют до копейки: сумма заявки должна быть представима в валюте объекта. */
 const roundMoney = (n) => Math.round(((Number(n) || 0) + Number.EPSILON) * 100) / 100
 
@@ -116,6 +131,11 @@ export default function PurchaseModal({ property, onClose, onSuccess }) {
 
 
   const [qty, setQty] = useState(SMALLEST_TOKEN)
+  // Черновик поля «сумма». Пока в него печатают, показываем ровно набранные символы: если
+  // подставлять сюда пересчитанную и отформатированную сумму на каждое нажатие, «5» превращается
+  // в «5,00» и дописать «00» до пятисот уже невозможно. Вне ввода (null) поле показывает реальную
+  // сумму заявки — ту, что уйдёт на бэкенд.
+  const [amountDraft, setAmountDraft] = useState(null)
   const [status, setStatus] = useState('idle') // idle | loading | done | error
   const [error, setError] = useState('')
   const [showKyc, setShowKyc] = useState(false) // открыта ли модалка верификации
@@ -124,6 +144,7 @@ export default function PurchaseModal({ property, onClose, onSuccess }) {
   useEffect(() => {
     if (isOpen) {
       setQty(floorToScale(Math.min(100, maxQty)) || SMALLEST_TOKEN)
+      setAmountDraft(null)
       setStatus('idle')
       setError('')
       setShowKyc(false)
@@ -163,6 +184,26 @@ export default function PurchaseModal({ property, onClose, onSuccess }) {
     return Math.min(maxQty, Math.max(SMALLEST_TOKEN, parsed))
   }
   const priceLabel = `${fmtMoney(price)} ${currency}`.trim()
+
+  // Сумма → количество долей. Считать «сколько токенов на 500 сом» в уме человек не должен: заявка
+  // и так уходит суммой, а бэкенд выводит из неё количество тем же делением с отсечением вниз.
+  const handleAmountChange = (raw) => {
+    setAmountDraft(raw)
+    if (price <= 0) return
+
+    const parsed = parseAmount(raw)
+    if (!Number.isFinite(parsed) || parsed <= 0) return
+
+    // clampQty отсекает вниз до сотой доли и держит границы выпуска: сумма меньше стоимости
+    // минимальной доли поднимается до неё, больше остатка — опускается до остатка.
+    setQty(clampQty(parsed / price))
+  }
+
+  // Поле показывает набранное, пока в нём печатают, и фактическую сумму заявки в остальное время.
+  // Так видно, во что превратилось «500» после отсечения до сотых долей.
+  const amountValue = amountDraft ?? fmtMoney(calc.investment)
+  const minAmount = roundMoney(SMALLEST_TOKEN * price)
+  const maxAmount = roundMoney(maxQty * price)
 
   const handleBuy = async () => {
     // Без сессии открываем вход прямо здесь: та же модалка, что и для верификации, просто
@@ -311,6 +352,31 @@ export default function PurchaseModal({ property, onClose, onSuccess }) {
                     {fmtQty(maxQty)} токенов ({fmtMoney(maxQty * price)} {currency})
                   </span>
                 </div>
+
+                <div className="buy-amount-row">
+                  <label className="buy-amount-label" htmlFor="buy-amount">
+                    …или введите сумму
+                  </label>
+                  <div className="buy-amount-field">
+                    <input
+                      id="buy-amount"
+                      type="text"
+                      inputMode="decimal"
+                      className="buy-amount-input"
+                      value={amountValue}
+                      onChange={(e) => handleAmountChange(e.target.value)}
+                      onBlur={() => setAmountDraft(null)}
+                      placeholder={fmtMoney(minAmount)}
+                      aria-label={`Сумма вложения в ${currency}`}
+                      aria-describedby="buy-amount-hint"
+                    />
+                    <span className="buy-amount-currency">{currency}</span>
+                  </div>
+                </div>
+                <p className="buy-amount-hint" id="buy-amount-hint">
+                  Количество токенов и ползунок подстроятся под сумму. От {fmtMoney(minAmount)} до{' '}
+                  {fmtMoney(maxAmount)} {currency}.
+                </p>
 
                 <div className="buy-summary">
                   <div className="buy-summary-row">

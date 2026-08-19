@@ -3747,6 +3747,60 @@ body::after {
   font-size: 0.66rem;
   color: var(--ink-3);
 }
+/* Ввод суммы: второй способ задать ту же покупку. Тот же ряд, что у количества, — поле справа
+   стоит ровно под числовым полем токенов, поэтому видно, что это две проекции одной величины. */
+.buy-amount-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 1.1rem;
+}
+.buy-amount-label {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+.buy-amount-field {
+  position: relative;
+  flex: 0 0 auto;
+}
+.buy-amount-input {
+  /* Ширина как у поля количества, чтобы поля стояли одной колонкой; место под валюту справа. */
+  width: 132px;
+  padding: 0.7rem 2.6rem 0.7rem 0.8rem;
+  text-align: center;
+  font-size: 1rem;
+  font-weight: 500;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper-2);
+  color: var(--ink);
+}
+.buy-amount-input:focus {
+  outline: none;
+  border-color: var(--amber);
+}
+.buy-amount-currency {
+  position: absolute;
+  right: 0.7rem;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--ink-3);
+}
+.buy-amount-hint {
+  margin-top: 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  line-height: 1.5;
+  color: var(--ink-3);
+}
+
 .buy-summary {
   margin-top: 1.4rem;
   padding: 1.3rem 1.4rem;
@@ -3859,6 +3913,14 @@ body::after {
   }
   .buy-slider-row {
     gap: 0.7rem;
+  }
+  .buy-amount-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+  .buy-amount-input {
+    width: 100%;
   }
   .buy-qty-input {
     width: 74px;
