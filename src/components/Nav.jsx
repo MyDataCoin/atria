@@ -4,6 +4,7 @@ import { useContent, useLang } from '../i18n.jsx'
 import Registration from './Registration.jsx'
 import { tokens, onSessionLost, onAuthChange } from '../lib/api.js'
 import { logout } from '../lib/auth.js'
+import { getKycStatus, KycStatus } from '../lib/kyc.js'
 import { DASHBOARD_URL } from '../lib/dashboard.js'
 
 const EASE = [0.16, 1, 0.3, 1]
@@ -19,6 +20,34 @@ export default function Nav() {
   // Шапка обязана показывать, вошёл человек или нет. Раньше «Войти» висело всегда, поэтому
   // понять своё состояние было невозможно: вошёл ты, вышел, протухла ли сессия — вид один.
   const [authed, setAuthed] = useState(() => tokens.isAuthed)
+
+  /**
+   * Пройдена ли проверка личности: true | false | null («ещё не знаем» или спросить не удалось).
+   *
+   * От этого зависит, что предлагать вошедшему. Кабинет человеку без KYC показывать нечего — там
+   * пустой портфель и заблокированная покупка, — поэтому вместо «Дашборда» ему предлагается
+   * «Продолжить»: та же модалка доводит его до проверки личности и привязки кошелька.
+   * При null оставляем «Дашборд» — не знаем и не мешаем.
+   */
+  const [kycApproved, setKycApproved] = useState(null)
+
+  const refreshKyc = () => {
+    if (!tokens.isAuthed) {
+      setKycApproved(null)
+      return
+    }
+    getKycStatus()
+      // Профиля нет вовсе (только что зарегистрировались) — значит проверку не проходили.
+      .then((profile) => setKycApproved(profile ? profile.status === KycStatus.Approved : false))
+      .catch(() => setKycApproved(null))
+  }
+
+  // Состояние входа меняется и не из шапки (модалка покупки, соседняя вкладка) — статус
+  // перезапрашиваем на каждый такой переход.
+  useEffect(() => {
+    refreshKyc()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authed])
 
   // Сессия могла умереть в любом фоновом запросе — сразу отражаем это в шапке.
   useEffect(() => onSessionLost(() => setAuthed(false)), [])
@@ -38,6 +67,9 @@ export default function Nav() {
   const closeAuth = () => {
     setAuthMode(null)
     setAuthed(tokens.isAuthed)
+    // Проверку личности человек мог пройти прямо в этой модалке — тогда «Продолжить» обязано
+    // смениться на «Дашборд» сразу, а не после перезагрузки страницы.
+    refreshKyc()
   }
 
   useEffect(() => {
@@ -79,6 +111,16 @@ export default function Nav() {
     setAuthMode('login')
   }
 
+  // «Продолжить» для вошедшего без KYC. Модалка открывается тем же режимом, что и вход: увидев
+  // живую сессию, она пропускает телефон и начинает с проверки личности, а дальше ведёт к кошельку.
+  const openOnboarding = () => {
+    closeMenu()
+    setAuthMode('login')
+  }
+
+  // Вошёл, но проверку личности не прошёл — кабинет ему пока показывать не за чем.
+  const needsOnboarding = authed && kycApproved === false
+
   return (
     <>
       <motion.nav
@@ -110,9 +152,15 @@ export default function Nav() {
               Гостю — зарегистрироваться или войти. */}
           {authed ? (
             <>
-              <a href={DASHBOARD_URL} className="nav-cta magnetic">
-                Дашборд
-              </a>
+              {needsOnboarding ? (
+                <button type="button" className="nav-cta magnetic" onClick={openOnboarding}>
+                  Продолжить
+                </button>
+              ) : (
+                <a href={DASHBOARD_URL} className="nav-cta magnetic">
+                  Дашборд
+                </a>
+              )}
               <button type="button" className="nav-cta magnetic login-btn" onClick={handleLogout}>
                 Выйти
               </button>
@@ -172,9 +220,15 @@ export default function Nav() {
 
                 {authed ? (
                   <>
-                    <a href={DASHBOARD_URL} className="nav-cta" onClick={closeMenu}>
-                      Дашборд
-                    </a>
+                    {needsOnboarding ? (
+                      <button type="button" className="nav-cta" onClick={openOnboarding}>
+                        Продолжить
+                      </button>
+                    ) : (
+                      <a href={DASHBOARD_URL} className="nav-cta" onClick={closeMenu}>
+                        Дашборд
+                      </a>
+                    )}
                     <button type="button" className="nav-cta login-btn" onClick={handleLogout}>
                       Выйти
                     </button>
