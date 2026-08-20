@@ -30,6 +30,21 @@ export function requestOtp(phone) {
 }
 
 /**
+ * Занят ли номер. Спрашиваем ДО отправки кода: человек, нажавший «Войти» с номером, которого нет в
+ * базе, должен узнать об этом сразу, а не после ввода кода.
+ *
+ * Возвращает true/false. Ошибку сети наверх не поднимаем как «незарегистрирован» — вызывающий код
+ * сам решает, что делать, поэтому здесь исключение прокидывается как есть.
+ */
+export async function isPhoneRegistered(phone) {
+  const data = await apiFetch('/auth/phone/status', {
+    method: 'POST',
+    body: { phone: toApiPhone(phone) },
+  })
+  return Boolean(data?.registered)
+}
+
+/**
  * Шаг 2: подтвердить код. При первом успешном вызове создаётся аккаунт Investor.
  * Возвращает AuthTokensDto и сразу сохраняет токены.
  *

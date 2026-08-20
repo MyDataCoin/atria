@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { requestOtp, verifyOtp } from '../lib/auth.js'
+import { isPhoneRegistered, requestOtp, verifyOtp } from '../lib/auth.js'
 import {
   submitKyc,
   getKycStatus,
@@ -289,6 +289,30 @@ export default function Registration({ mode, onClose, onSuccess }) {
       return
     }
     setError('')
+
+    // Сверяем номер с базой ДО кода: «Войти» с незарегистрированным номером и «Регистрация» с
+    // существующим — это не ошибка ввода, а не та дверь, и говорить об этом надо сразу.
+    // Проверка не заменяет ту, что стоит на verify-otp: ту обойти нельзя, эта только про интерфейс.
+    // Ошибка сети здесь ничего не решает — молча пропускаем дальше, развилку поймает verify-otp.
+    setLoading(true)
+    try {
+      const registered = await isPhoneRegistered(phone)
+      if (activeMode === 'login' && !registered) {
+        setSwitchPrompt('not-registered')
+        setStep(11)
+        return
+      }
+      if (activeMode === 'register' && registered) {
+        setSwitchPrompt('already-registered')
+        setStep(11)
+        return
+      }
+    } catch {
+      /* проверка не обязательна для продолжения — идём дальше */
+    } finally {
+      setLoading(false)
+    }
+
     // DEV-заглушка: SMS не отправляем (шлюз лежит) — сразу к вводу кода с подставленным 111111.
     if (DEV_STUB_OTP) {
       setStep(2)
