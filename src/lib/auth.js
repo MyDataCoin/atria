@@ -32,11 +32,17 @@ export function requestOtp(phone) {
 /**
  * Шаг 2: подтвердить код. При первом успешном вызове создаётся аккаунт Investor.
  * Возвращает AuthTokensDto и сразу сохраняет токены.
+ *
+ * `intent` — какую кнопку нажал человек: 'login' или 'register'. Дверь одна, но обещания у кнопок
+ * разные, и бэкенд по этому полю различает случаи, которые иначе выглядят одинаково:
+ * «Войти» с номером, которого нет в базе, вернёт 404 `auth.phone_not_registered` и НИЧЕГО не создаст,
+ * а «Регистрация» с уже существующим номером — 409 `auth.phone_already_registered`.
+ * Без intent поведение прежнее: вход с созданием аккаунта при первом обращении.
  */
-export async function verifyOtp(phone, code) {
+export async function verifyOtp(phone, code, intent) {
   const data = await apiFetch('/auth/register/phone/verify-otp', {
     method: 'POST',
-    body: { phone: toApiPhone(phone), code },
+    body: { phone: toApiPhone(phone), code, ...(intent ? { intent } : {}) },
   })
   if (data) tokens.save(data)
   return data

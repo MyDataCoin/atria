@@ -97,9 +97,23 @@ function verifyErrorMessage(err) {
 export default function Registration({ mode, onClose, onSuccess }) {
   const isOpen = mode === 'register' || mode === 'login'
 
+  /**
+   * Каким входом человек пользуется ПРЯМО СЕЙЧАС.
+   *
+   * Открывает модалку родитель (кнопка «Войти» или «Начать»), но со шага «номер не зарегистрирован»
+   * человек должен уметь перейти в регистрацию, не закрывая окно и не набирая номер заново. Поэтому
+   * поверх пришедшего режима лежит собственный, и сбрасывается он при каждом открытии.
+   */
+  const [modeOverride, setModeOverride] = useState(null)
+  const activeMode = modeOverride ?? mode
+
+  // Какую развилку показать на шаге 11: null | 'not-registered' | 'already-registered'.
+  const [switchPrompt, setSwitchPrompt] = useState(null)
+
   // steps: 1 = phone, 2 = code, 3 = success, 4 = kyc prompt, 5 = kyc result,
   //        6 = wallet choice, 7 = metamask instructions, 8 = wallet input,
-  //        9 = final success, 10 = incomplete warning
+  //        9 = final success, 10 = incomplete warning,
+  //        11 = «не туда попали»: номер не зарегистрирован / уже зарегистрирован
   const [step, setStep] = useState(1)
   const [phone, setPhone] = useState('+996 ')
   const [code, setCode] = useState(Array(CODE_LENGTH).fill(''))
@@ -132,6 +146,8 @@ export default function Registration({ mode, onClose, onSuccess }) {
       setKycApproved(false)
       setConsent(false)
       setShowConsentDoc(false)
+      setModeOverride(null)
+      setSwitchPrompt(null)
 
       // Куда открывать модалку:
       // • нет живой сессии → телефон (шаг 1);
@@ -334,10 +350,24 @@ export default function Registration({ mode, onClose, onSuccess }) {
     setLoading(true)
     setError('')
     try {
-      const result = await verifyOtp(phone, joined)
+      const result = await verifyOtp(phone, joined, activeMode)
       setStep(3)
-      onSuccess?.({ phone, mode, tokens: result })
+      onSuccess?.({ phone, mode: activeMode, tokens: result })
     } catch (err) {
+      // Две развилки, ради которых бэкенду и передаётся intent: вход с незнакомым номером и
+      // регистрация уже существующего. Это не ошибка ввода — человек просто нажал не ту кнопку,
+      // поэтому вместо красной строки под полем показываем экран с переходом туда, куда он и хотел.
+      if (err instanceof ApiError && err.problem?.title === 'auth.phone_not_registered') {
+        setSwitchPrompt('not-registered')
+        setStep(11)
+        return
+      }
+      if (err instanceof ApiError && err.problem?.title === 'auth.phone_already_registered') {
+        setSwitchPrompt('already-registered')
+        setStep(11)
+        return
+      }
+
       // Раньше сюда сваливалась ЛЮБАЯ ошибка и подписывалась «неверный код»: лежащий бэкенд,
       // упавший прокси, отсутствие сети — всё выглядело как ошибка человека, который ввёл
       // правильные цифры. Разделяем: код неверен только когда так сказал сервер.
@@ -545,7 +575,7 @@ export default function Registration({ mode, onClose, onSuccess }) {
               </svg>
             </button>
 
-            <span className="eyebrow">{mode === 'login' ? 'Вход' : 'Регистрация'}</span>
+            <span className="eyebrow">{activeMode === 'login' ? 'Вход' : 'Регистрация'}</span>
 
             <AnimatePresence mode="wait">
               {step === 1 && (
@@ -641,7 +671,7 @@ export default function Registration({ mode, onClose, onSuccess }) {
                 </motion.div>
               )}
 
-              {step === 3 && mode === 'register' && (
+              {step === 3 && activeMode === 'register' && (
                 <motion.div
                   key="step3-register"
                   initial={{ opacity: 0, y: 12 }}
@@ -671,7 +701,7 @@ export default function Registration({ mode, onClose, onSuccess }) {
                 </motion.div>
               )}
 
-              {step === 3 && mode === 'login' && (
+              {step === 3 && activeMode === 'login' && (
                 <motion.div
                   key="step3-login"
                   initial={{ opacity: 0, y: 12 }}
@@ -697,6 +727,64 @@ export default function Registration({ mode, onClose, onSuccess }) {
                   <button className="btn btn-primary reg-submit" onClick={onClose}>
                     <span>Продолжить</span>
                     <span className="dot" />
+                  </button>
+                </motion.div>
+              )}
+
+              {step === 11 && (
+                <motion.div
+                  key="step11-switch"
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -12 }}
+                  transition={{ duration: 0.35, ease: EASE }}
+                  className="reg-success"
+                >
+                  <div className="reg-success-icon reg-success-icon--neutral">
+                    <svg viewBox="0 0 24 24" width="28" height="28">
+                      <path
+                        d="M12 8v5m0 3.5h.01M12 3l9 16H3l9-16z"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        fill="none"
+                      />
+                    </svg>
+                  </div>
+                  <h2 className="reg-title display">
+                    {switchPrompt === 'not-registered' ? 'Номер не зарегистрирован' : 'Номер уже зарегистрирован'}
+                  </h2>
+                  <p className="reg-sub">
+                    {switchPrompt === 'not-registered'
+                      ? `На номер ${phone.trim()} аккаунта пока нет. Пройдите регистрацию — это тот же номер и тот же код из СМС.`
+                      : `Номер ${phone.trim()} уже используется. Войдите в существующий аккаунт — заводить второй не нужно.`}
+                  </p>
+                  <button
+                    className="btn btn-primary reg-submit"
+                    onClick={() => {
+                      // Переключаем режим и возвращаем к номеру: код одноразовый, поэтому в реальном
+                      // режиме его придётся запросить заново, а номер остаётся набранным.
+                      setModeOverride(switchPrompt === 'not-registered' ? 'register' : 'login')
+                      setSwitchPrompt(null)
+                      setCode(Array(CODE_LENGTH).fill(''))
+                      setError('')
+                      setStep(1)
+                    }}
+                  >
+                    <span>{switchPrompt === 'not-registered' ? 'Пройти регистрацию' : 'Войти в аккаунт'}</span>
+                    <span className="dot" />
+                  </button>
+                  <button
+                    className="btn btn-ghost reg-submit"
+                    onClick={() => {
+                      setSwitchPrompt(null)
+                      setCode(Array(CODE_LENGTH).fill(''))
+                      setError('')
+                      setStep(1)
+                    }}
+                  >
+                    <span>Указать другой номер</span>
                   </button>
                 </motion.div>
               )}
