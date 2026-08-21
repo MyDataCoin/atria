@@ -152,6 +152,19 @@ export class RefreshUnavailableError extends ApiError {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
+// Потолок на одну попытку обновления и на все попытки вместе. Обновление стоит в начале очереди —
+// пока оно идёт, ждут все запросы страницы, и без ограничения «сервер задумался» означало замерший
+// интерфейс на неопределённое время. С потолком это обычная ошибка, которую есть кому повторить.
+const REFRESH_ATTEMPT_TIMEOUT_MS = 8_000
+const REFRESH_TOTAL_BUDGET_MS = 20_000
+
+/** AbortSignal, срабатывающий через ms. Свой, а не AbortSignal.timeout — тот есть не везде. */
+function timeoutSignal(ms) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), ms)
+  return { signal: controller.signal, done: () => clearTimeout(timer) }
+}
+
 // Пара повторов перед тем, как признать обновление неудачным: одна неудачная попытка — это ещё
 // не приговор сессии.
 const REFRESH_RETRY_DELAYS_MS = [400, 1200]
@@ -199,11 +212,19 @@ function scheduleProactiveRefresh() {
 async function refreshSession() {
   refreshInFlight ??= (async () => {
     let lastError = null
+    const deadline = Date.now() + REFRESH_TOTAL_BUDGET_MS
 
     for (let attempt = 0; attempt <= REFRESH_RETRY_DELAYS_MS.length; attempt += 1) {
       if (attempt > 0) await sleep(REFRESH_RETRY_DELAYS_MS[attempt - 1])
 
+      // Бюджет вышел: держать очередь запросов дальше нельзя. Сессию не трогаем — попробует
+      // следующий вызов, возврат во вкладку или восстановление сети.
+      if (Date.now() >= deadline) break
+
       let res
+      const attemptTimeout = timeoutSignal(
+        Math.min(REFRESH_ATTEMPT_TIMEOUT_MS, deadline - Date.now()),
+      )
       try {
         res = await fetch(`${BASE_URL}/api/v1${REFRESH_PATH}`, {
           method: 'POST',
@@ -211,10 +232,13 @@ async function refreshSession() {
           credentials: 'include',
           // Пустое тело: обновление идёт исключительно по HttpOnly-куке.
           body: JSON.stringify({}),
+          signal: attemptTimeout.signal,
         })
       } catch (networkErr) {
         lastError = networkErr
         continue
+      } finally {
+        attemptTimeout.done()
       }
 
       if (res.status === 401 || res.status === 403) {
