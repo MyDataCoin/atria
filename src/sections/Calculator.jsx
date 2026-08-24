@@ -4,12 +4,12 @@ import { Accent } from '../lib/accent.jsx'
 import Reveal from '../components/Reveal.jsx'
 import { useContent } from '../i18n.jsx'
 
-const money = (n) => '$' + Math.round(n).toLocaleString('ru-RU')
+const money = (n) => Math.round(n).toLocaleString('ru-RU') + ' сом'
 
 export default function Calculator() {
   const c = useContent().calc
   const ui = c.ui
-  const [amount, setAmount] = useState(1150)
+  const [amount, setAmount] = useState(100000)
   const [rate, setRate] = useState(8)
   const [period, setPeriod] = useState('quarter')
 
@@ -45,9 +45,9 @@ export default function Calculator() {
             <div className="big">{money(amount)}</div>
             <input
               type="range"
-              min={115}
-              max={50000}
-              step={115}
+              min={c.pricePerM2}
+              max={c.pricePerM2 * 435}
+              step={c.pricePerM2}
               value={amount}
               onChange={(e) => setAmount(Number(e.target.value))}
               aria-label={ui.contribution}
