@@ -137,8 +137,9 @@ export default function DetailsModal({ property, onClose, isBuilding = false, on
           ['Этаж', data.floorNumber],
           ['Комнатность', data.roomCount ? `${data.roomCount}-комнатная` : null],
           ['Общая площадь', data.totalArea ? `${area(data.totalArea)} м²` : null],
-          // Дальше — про здание, в котором оно находится.
+          // Вид недвижимости — самого помещения, а не здания: гараж в жилом доме коммерческий.
           ['Тип недвижимости', data.type],
+          // Дальше — про здание, в котором оно находится.
           ['Город', data.city],
           ['Год постройки', data.year],
           ['Застройщик', data.developer],
