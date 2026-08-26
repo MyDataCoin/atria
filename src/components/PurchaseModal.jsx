@@ -10,55 +10,42 @@ const EASE = [0.16, 1, 0.3, 1]
 // Иллюстративная годовая доходность для оценки прироста дохода (как в калькуляторе).
 const ANNUAL_RATE = 8
 
-// Доля делится до одной сотой — тот же масштаб, что у TokenAmount.Scale на бэкенде и у
-// decimals() токена. Мельче не существует, поэтому и вводить мельче нельзя.
-const TOKEN_SCALE = 2
-const SMALLEST_TOKEN = 1 / 10 ** TOKEN_SCALE
+// Доля неделима: decimals() токена равен нулю, и TokenAmount.Scale на бэкенде — тоже. Купить
+// можно только целое число долей, и самая маленькая покупка — одна.
+const SMALLEST_TOKEN = 1
 
-/** Количество токенов: показываем дробь только когда она есть, иначе целое без хвоста нулей. */
-const fmtQty = (n) => {
-  const value = Number(n) || 0
-  return new Intl.NumberFormat('ru-RU', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: TOKEN_SCALE,
-  }).format(value)
-}
+/** Количество токенов — всегда целое число. */
+const fmtQty = (n) =>
+  new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 }).format(Math.trunc(Number(n) || 0))
 
-/** Сумма в валюте объекта: до копейки, потому что дробный токен стоит дробных денег. */
+/** Сумма в валюте объекта: до копейки, потому что цена доли может быть некруглой. */
 const fmtMoney = (n) =>
   new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(
     Number(n) || 0,
   )
 
 /**
- * Доля собственности в процентах. Трёх знаков хватало, пока минимум был целый токен; с сотыми
- * долями маленькая покупка показывалась бы как «+0,000%», поэтому у мелких значений знаков
- * больше — вплоть до первой значащей цифры.
+ * Доля собственности в процентах. Минимум — одна целая доля выпуска, поэтому трёх знаков хватает:
+ * даже в выпуске на 100 000 долей одна доля — это 0,001%.
  */
 const fmtShare = (percent) => {
   const value = Number(percent) || 0
   if (value === 0) return '0'
-  const digits = value >= 0.001 ? 3 : Math.min(8, Math.ceil(-Math.log10(value)) + 2)
   // Через Intl, а не toFixed: иначе доля печаталась бы через точку рядом с суммами через запятую.
   return new Intl.NumberFormat('ru-RU', {
-    minimumFractionDigits: digits,
-    maximumFractionDigits: digits,
+    minimumFractionDigits: 3,
+    maximumFractionDigits: 3,
   }).format(value)
 }
 
 /**
- * Отсечение вниз до масштаба доли — ровно как TokenAmount.Floor на бэкенде.
+ * Отсечение вниз до целой доли — ровно как TokenAmount.FromMoney на бэкенде.
  *
- * Домножение сначала приводится к целому с допуском: в двоичной арифметике `0.29 * 100` равно
- * 28.999999999999996, и голый Math.floor вернул бы 0.28. Из-за этого стрелка «вверх» в поле
- * количества намертво застревала на 0.28 — каждый клик давал 0.29, а мы срезали его обратно.
- * Значения, у которых дробь настоящая (33.333 → 33.33), отсекаются как и раньше: допуск на
- * девятом знаке их не задевает.
+ * Допуск перед отсечением обязателен: в двоичной арифметике `2450 * 3 / 2450` равно
+ * 2.9999999999999996, и голый Math.floor вернул бы 2 доли вместо трёх — заявка молча
+ * недосчитывалась бы одной доли на ровном месте.
  */
-const floorToScale = (n) => {
-  const scaled = (Number(n) || 0) * 10 ** TOKEN_SCALE
-  return Math.floor(Math.round(scaled * 1e6) / 1e6) / 10 ** TOKEN_SCALE
-}
+const floorToWhole = (n) => Math.floor(Math.round((Number(n) || 0) * 1e6) / 1e6)
 
 /**
  * Разбор суммы, введённой человеком: «1 200,50», «1200.5», «500 сом» — всё это одно число.
@@ -78,44 +65,12 @@ const parseAmount = (raw) => {
 /** Деньги существуют до копейки: сумма заявки должна быть представима в валюте объекта. */
 const roundMoney = (n) => Math.round(((Number(n) || 0) + Number.EPSILON) * 100) / 100
 
-// Ползунок работает в позициях, а не в токенах: шкала логарифмическая.
-// Выпуск — это 10 000 долей, а покупают доли вроде 0,28 или 1,63; на линейной дорожке они все
-// прижаты к левому краю и ползунок выглядит замершим. По логарифму каждый порядок величины
-// получает равный кусок дорожки, поэтому бегунок заметно двигается и на сотых, и на тысячах.
-const SLIDER_POSITIONS = 1000
-
 /**
- * Шаг, круглый для своего порядка: сотые у мелких значений, десятые у десятков, единицы у сотен.
- * Без этого логарифм давал бы значения вроде 1,6374829 — ползунок должен попадать в числа,
- * которые человек готов увидеть в заявке.
+ * Ползунок ходит прямо по долям: минимум — одна, максимум — остаток выпуска, шаг — целая доля.
+ * Логарифмическая шкала была нужна, пока покупали 0,28 доли и линейная дорожка прижимала такие
+ * значения к левому краю. Целые доли распределены по дорожке равномерно, поэтому лишний
+ * пересчёт позиций только добавлял бы промахи мимо круглых чисел.
  */
-const stepFor = (value) => {
-  const magnitude = 10 ** Math.floor(Math.log10(Math.abs(Number(value) || SMALLEST_TOKEN)))
-  return Math.max(SMALLEST_TOKEN, magnitude / 100)
-}
-
-/** Округление к ближайшему шагу своего порядка. */
-const snapQty = (value) => {
-  const step = stepFor(value)
-  return Math.round(Math.round((value / step) * 1e6) / 1e6) * step
-}
-
-/** Позиция ползунка (0…SLIDER_POSITIONS) → количество токенов. */
-const positionToQty = (position, max) => {
-  const span = Math.log(max / SMALLEST_TOKEN)
-  if (!(span > 0)) return max
-  if (position <= 0) return SMALLEST_TOKEN
-  if (position >= SLIDER_POSITIONS) return max
-  return SMALLEST_TOKEN * Math.exp((span * position) / SLIDER_POSITIONS)
-}
-
-/** Количество токенов → позиция ползунка. Обратная к positionToQty. */
-const qtyToPosition = (qty, max) => {
-  const span = Math.log(max / SMALLEST_TOKEN)
-  if (!(span > 0)) return SLIDER_POSITIONS
-  const clamped = Math.min(max, Math.max(SMALLEST_TOKEN, Number(qty) || SMALLEST_TOKEN))
-  return Math.round((SLIDER_POSITIONS * Math.log(clamped / SMALLEST_TOKEN)) / span)
-}
 
 /**
  * Модалка покупки доли в объекте. Открывается по кнопке «Купить» на карточке.
@@ -127,7 +82,9 @@ export default function PurchaseModal({ property, onClose, onSuccess }) {
   const price = Number(property?.tokenPrice) || 0
   const currency = property?.currency || ''
   const total = Number(property?.totalTokens) || 0
-  const maxQty = Math.max(SMALLEST_TOKEN, Number(property?.availableTokens ?? total) || SMALLEST_TOKEN)
+  // Остаток выпуска приходит с бэкенда целым (bigint), но подстрахуемся: дробный максимум сделал бы
+  // дробным и верхний конец ползунка.
+  const maxQty = Math.max(SMALLEST_TOKEN, floorToWhole(property?.availableTokens ?? total) || SMALLEST_TOKEN)
 
 
   const [qty, setQty] = useState(SMALLEST_TOKEN)
@@ -143,7 +100,7 @@ export default function PurchaseModal({ property, onClose, onSuccess }) {
   // Сброс при каждом открытии нового объекта.
   useEffect(() => {
     if (isOpen) {
-      setQty(floorToScale(Math.min(100, maxQty)) || SMALLEST_TOKEN)
+      setQty(floorToWhole(Math.min(100, maxQty)) || SMALLEST_TOKEN)
       setAmountDraft(null)
       setStatus('idle')
       setError('')
@@ -164,11 +121,11 @@ export default function PurchaseModal({ property, onClose, onSuccess }) {
   }, [isOpen, showKyc, onClose])
 
   const calc = useMemo(() => {
-    // Заявка уходит суммой, а количество долей бэкенд выводит из неё сам (floor до масштаба доли).
+    // Заявка уходит суммой, а количество долей бэкенд выводит из неё сам (floor до целой доли).
     // Поэтому сумму сперва приводим к копейкам — в валюте объекта меньше копейки ничего нет, —
     // и уже из неё считаем количество. Тогда показанное число ровно то, что зарегистрируется.
     const investment = roundMoney(qty * price)
-    const effectiveQty = price > 0 ? floorToScale(investment / price) : 0
+    const effectiveQty = price > 0 ? floorToWhole(investment / price) : 0
     const share = total > 0 ? (effectiveQty / total) * 100 : 0
     const monthly = (investment * ANNUAL_RATE) / 100 / 12
     return { investment, effectiveQty, share, monthly }
@@ -176,10 +133,10 @@ export default function PurchaseModal({ property, onClose, onSuccess }) {
 
   if (!property) return null
 
-  // Раньше здесь стоял Math.floor до целого токена. Доли делимы, поэтому округляем не до штуки,
-  // а до масштаба доли — и всегда вниз, чтобы заявка не просила больше, чем человек ввёл.
+  // Доля неделима, поэтому округляем до штуки — и всегда вниз, чтобы заявка не просила больше,
+  // чем человек ввёл, и не могла перебрать остаток выпуска.
   const clampQty = (v) => {
-    const parsed = floorToScale(Number(v))
+    const parsed = floorToWhole(Number(v))
     if (!Number.isFinite(parsed) || parsed <= 0) return SMALLEST_TOKEN
     return Math.min(maxQty, Math.max(SMALLEST_TOKEN, parsed))
   }
@@ -194,13 +151,13 @@ export default function PurchaseModal({ property, onClose, onSuccess }) {
     const parsed = parseAmount(raw)
     if (!Number.isFinite(parsed) || parsed <= 0) return
 
-    // clampQty отсекает вниз до сотой доли и держит границы выпуска: сумма меньше стоимости
-    // минимальной доли поднимается до неё, больше остатка — опускается до остатка.
+    // clampQty отсекает вниз до целой доли и держит границы выпуска: сумма меньше стоимости
+    // одной доли поднимается до неё, больше остатка — опускается до остатка.
     setQty(clampQty(parsed / price))
   }
 
   // Поле показывает набранное, пока в нём печатают, и фактическую сумму заявки в остальное время.
-  // Так видно, во что превратилось «500» после отсечения до сотых долей.
+  // Так видно, во что превратилось «500» после отсечения до целых долей.
   const amountValue = amountDraft ?? fmtMoney(calc.investment)
   const minAmount = roundMoney(SMALLEST_TOKEN * price)
   const maxAmount = roundMoney(maxQty * price)
@@ -323,13 +280,11 @@ export default function PurchaseModal({ property, onClose, onSuccess }) {
                 <div className="buy-slider-row">
                   <input
                     type="range"
-                    min={0}
-                    max={SLIDER_POSITIONS}
-                    step={1}
-                    value={qtyToPosition(qty, maxQty)}
-                    onChange={(e) =>
-                      setQty(clampQty(snapQty(positionToQty(Number(e.target.value), maxQty))))
-                    }
+                    min={SMALLEST_TOKEN}
+                    max={maxQty}
+                    step={SMALLEST_TOKEN}
+                    value={qty}
+                    onChange={(e) => setQty(clampQty(e.target.value))}
                     aria-label="Количество токенов"
                     aria-valuetext={`${fmtQty(qty)} токенов`}
                   />
@@ -346,7 +301,7 @@ export default function PurchaseModal({ property, onClose, onSuccess }) {
 
                 <div className="buy-range-ends">
                   <span>
-                    от {fmtQty(SMALLEST_TOKEN)} токена ({fmtMoney(SMALLEST_TOKEN * price)} {currency})
+                    от {fmtQty(SMALLEST_TOKEN)} токена ({fmtMoney(minAmount)} {currency})
                   </span>
                   <span>
                     {fmtQty(maxQty)} токенов ({fmtMoney(maxQty * price)} {currency})
@@ -374,8 +329,8 @@ export default function PurchaseModal({ property, onClose, onSuccess }) {
                   </div>
                 </div>
                 <p className="buy-amount-hint" id="buy-amount-hint">
-                  Количество токенов и ползунок подстроятся под сумму. От {fmtMoney(minAmount)} до{' '}
-                  {fmtMoney(maxAmount)} {currency}.
+                  Количество токенов и ползунок подстроятся под сумму, округляя её вниз до целого
+                  токена. От {fmtMoney(minAmount)} до {fmtMoney(maxAmount)} {currency}.
                 </p>
 
                 <div className="buy-summary">
@@ -411,7 +366,7 @@ export default function PurchaseModal({ property, onClose, onSuccess }) {
                   <div>
                     <strong>Соответствие регуляторным стандартам</strong>
                     <p>
-                      Дробное владение обеспечено записями первичной ипотеки и оформляется по
+                      Долевое владение обеспечено записями первичной ипотеки и оформляется по
                       законодательству Кыргызской Республики.
                     </p>
                   </div>
