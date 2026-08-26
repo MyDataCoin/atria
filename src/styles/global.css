@@ -1996,12 +1996,31 @@ body::after {
   margin-top: clamp(2.5rem, 5vw, 4rem);
   padding-top: clamp(2.5rem, 5vw, 4rem);
   border-top: 1px solid var(--line);
+  /* start, а не stretch: карточка риска короче примера, и растянутая на его высоту она оставляла
+     под текстом пустое поле в пол-экрана. */
+  align-items: start;
 }
 @media (max-width: 760px) {
   .hw-cards {
     grid-template-columns: 1fr;
   }
 }
+/* Внутри .hw-cards карточка получает лишь половину полосы, и двухколоночный callout там не
+   помещается: «100 000 сом = 10 м²» стоит в nowrap-колонке auto и забирает почти всю ширину, а
+   тексту остаётся полоска в одно-два слова. В своей колонке кладём заголовок и текст друг под
+   друга — строка снова нормальной длины. */
+.hw-cards .callout {
+  grid-template-columns: 1fr;
+  gap: 0.9rem;
+  align-items: start;
+}
+/* Ограничение строки: без него текст растягивается на всю ширину карточки (~85 знаков) —
+   читать такую строку тяжело, глазу трудно найти начало следующей. */
+.hw-cards .callout p,
+.risk-card p {
+  max-width: 62ch;
+}
+
 .risk-card {
   border-left: 2px solid color-mix(in srgb, var(--amber) 45%, transparent);
   padding-left: 1.4rem;
