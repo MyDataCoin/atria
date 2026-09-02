@@ -24,6 +24,15 @@ const UNIT_TYPES = {
   other: 'Помещение',
 }
 
+// Вид изображения. Рендер, показанный без подписи, — это картинка несуществующего здания,
+// показанная человеку, который решает, вкладывать ли в него деньги. Поэтому подпись едет
+// вместе с изображением, а не подразумевается.
+const IMAGE_KIND_LABELS = {
+  render: 'Визуализация',
+  floor_plan: 'Планировка',
+  site_plan: 'Генплан',
+}
+
 // Периодичность выплат. Показывается только по выпуску, который уже платит.
 const PAYOUT_FREQUENCIES = {
   monthly: 'Ежемесячно',
@@ -126,6 +135,8 @@ export default function DetailsModal({ property, onClose, isBuilding = false, on
       total,
       available,
       description: pick(property, ['description']),
+      // Блок о районе. Отдельно от описания: одно про объект, другое про то, что вокруг него.
+      locationDescription: pick(property, ['locationDescription']),
       // Характеристики объекта из PropertyDto.
       type: pick(property, ['propertyType', 'type']),
       city: pick(property, ['city']),
@@ -307,6 +318,13 @@ export default function DetailsModal({ property, onClose, isBuilding = false, on
                         <path d="M11 8v6M8 11h6M10 17a7 7 0 1 1 0-14 7 7 0 0 1 0 14zM20 20l-4.5-4.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" fill="none" />
                       </svg>
                     </span>
+                    {/* Подпись вида — на самом изображении: она должна быть видна ровно тогда,
+                        когда человек смотрит на картинку, а не в отдельном списке. */}
+                    {IMAGE_KIND_LABELS[data.images[imgIndex]?.kind] && (
+                      <span className="details-kind">
+                        {IMAGE_KIND_LABELS[data.images[imgIndex].kind]}
+                      </span>
+                    )}
                   </button>
                   {imgCount > 1 && (
                     <>
@@ -355,6 +373,15 @@ export default function DetailsModal({ property, onClose, isBuilding = false, on
               <div className="details-section">
                 <h4>Описание</h4>
                 <p>{data.description}</p>
+              </div>
+            )}
+
+            {/* Район и окружение — своя секция. Для участка на стадии проектирования это
+                большая часть того, что вообще можно рассказать об объекте. */}
+            {data.locationDescription && (
+              <div className="details-section">
+                <h4>Район и окружение</h4>
+                <p>{data.locationDescription}</p>
               </div>
             )}
 

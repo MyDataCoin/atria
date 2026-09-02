@@ -4072,6 +4072,23 @@ body::after {
   right: clamp(0.5rem, 3vw, 2rem);
 }
 /* Счётчик фото */
+/* Вид изображения — визуализация, планировка, генплан. Верхний левый угол: счётчик кадров
+   стоит в нижнем, и подпись не должна с ним пересекаться. */
+.details-kind {
+  position: absolute;
+  top: 0.7rem;
+  left: 0.7rem;
+  padding: 0.25em 0.6em;
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #fff;
+  background: color-mix(in srgb, #000 55%, transparent);
+  backdrop-filter: blur(4px);
+}
+
 .details-counter {
   position: absolute;
   bottom: 0.7rem;
