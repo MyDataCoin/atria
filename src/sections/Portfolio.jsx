@@ -26,7 +26,17 @@ const UNIT_TYPES = {
   parking_space: 'Парковочное место',
   commercial: 'Коммерческое помещение',
   storage: 'Кладовая',
+  land_plot: 'Земельный участок',
   other: 'Помещение',
+}
+
+// Стадия в плитке каталога — короткой подписью. Объект на стадии проектирования не должен
+// выглядеть в списке так же, как готовый и сданный.
+const STAGE_SHORT = {
+  land_only: 'Без строения',
+  design: 'Проектирование',
+  under_construction: 'Строительство',
+  commissioned: 'Сдан',
 }
 
 /**
@@ -35,12 +45,17 @@ const UNIT_TYPES = {
  */
 function unitLine(dto) {
   const area = Number(dto.totalAreaSqM)
+  // У участка нет ни этажной площади, ни этажа: вместо них — гектары, иначе строка
+  // схлопывается в один только тип.
+  const land = Number(dto.landAreaHectares)
   return [
     UNIT_TYPES[dto.unitType] || null,
     dto.unitNumber ? `№${dto.unitNumber}` : null,
     dto.roomCount ? `${dto.roomCount}-комн.` : null,
     Number.isFinite(area) && area > 0 ? `${area.toLocaleString('ru-RU')} м²` : null,
+    Number.isFinite(land) && land > 0 ? `${land.toLocaleString('ru-RU')} га` : null,
     dto.floorNumber != null ? `${dto.floorNumber} этаж` : null,
+    STAGE_SHORT[dto.constructionStage] || null,
   ]
     .filter(Boolean)
     .join(' · ')

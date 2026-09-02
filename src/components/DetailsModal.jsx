@@ -20,7 +20,27 @@ const UNIT_TYPES = {
   parking_space: 'Парковочное место',
   commercial: 'Коммерческое помещение',
   storage: 'Кладовая',
+  land_plot: 'Земельный участок',
   other: 'Помещение',
+}
+
+// Стадия строительства. Участок на стадии проектирования без этой подписи читается как
+// готовое здание — это раскрытие, а не оформление карточки.
+const CONSTRUCTION_STAGES = {
+  land_only: 'Земельный участок без строения',
+  design: 'Проектирование',
+  under_construction: 'Строительство',
+  commissioned: 'Введён в эксплуатацию',
+}
+
+// Дата ввода — только месяц и год: точный день до получения проектной документации никто
+// не назовёт, а показанный день читается как обязательство.
+const plannedDate = (value) => {
+  if (!value) return null
+  const d = new Date(value)
+  return Number.isNaN(d.getTime())
+    ? null
+    : d.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })
 }
 
 // Берём первое непустое значение из возможных имён поля (бэкенд может ещё не отдавать часть).
@@ -88,7 +108,7 @@ export default function DetailsModal({ property, onClose, isBuilding = false, on
       total,
       available,
       description: pick(property, ['description']),
-      // Характеристики — если бэкенд их отдаёт (в текущем PropertyDto их пока нет).
+      // Характеристики объекта из PropertyDto.
       type: pick(property, ['propertyType', 'type']),
       city: pick(property, ['city']),
       year: pick(property, ['yearBuilt', 'buildYear', 'year']),
@@ -102,6 +122,29 @@ export default function DetailsModal({ property, onClose, isBuilding = false, on
       floorNumber: property.floorNumber ?? null,
       roomCount: property.roomCount ?? null,
       totalArea: Number(property.totalAreaSqM) > 0 ? Number(property.totalAreaSqM) : null,
+      usableArea: Number(property.usableAreaSqM) > 0 ? Number(property.usableAreaSqM) : null,
+      // Описательные характеристики карточки. Заполняется тем, что есть: пустые поля просто
+      // не выводятся строкой, а не показываются прочерком.
+      documentedUse: pick(property, ['documentedUse']),
+      buildingClass: pick(property, ['buildingClass']),
+      wallMaterial: pick(property, ['wallMaterial']),
+      heating: pick(property, ['heating']),
+      elevator: pick(property, ['elevator']),
+      security: pick(property, ['security']),
+      parking: pick(property, ['parking']),
+      // Участок и стройка.
+      landArea: Number(property.landAreaHectares) > 0 ? Number(property.landAreaHectares) : null,
+      landPlotCode: pick(property, ['landPlotCode']),
+      cadastralNumber: pick(property, ['cadastralNumber']),
+      constructionStage: CONSTRUCTION_STAGES[property.constructionStage] || null,
+      plannedCompletion: plannedDate(property.plannedCompletionDate),
+      readinessPercent: property.readinessPercent ?? null,
+      // Проверка Кадастра. null — не проверяли, и на витрине это молчание, а не «свободен»:
+      // утверждать чистоту объекта, которую никто не проверял, нельзя.
+      isFreeOfEncumbrances:
+        property.isFreeOfEncumbrances === true || property.isFreeOfEncumbrances === false
+          ? property.isFreeOfEncumbrances
+          : null,
       rooms: (Array.isArray(property.rooms) ? property.rooms : []).filter((r) => r?.name),
       // Только для здания: помещения внутри. Черновики на витрину не пускаем — админу
       // бэкенд отдаёт их наравне с опубликованными.
@@ -134,17 +177,46 @@ export default function DetailsModal({ property, onClose, isBuilding = false, on
           // Сначала само помещение — ради него человек и открыл карточку.
           ['Тип помещения', data.unitType],
           ['Номер', data.unitNumber],
+          // У участка нет ни этажа, ни комнатности, ни этажной площади — вместо них гектары
+          // и кадастровые коды. Строки со значением null всё равно отфильтруются ниже,
+          // поэтому разделять список на два не нужно.
           ['Этаж', data.floorNumber],
           ['Комнатность', data.roomCount ? `${data.roomCount}-комнатная` : null],
           ['Общая площадь', data.totalArea ? `${area(data.totalArea)} м²` : null],
+          ['Полезная площадь', data.usableArea ? `${area(data.usableArea)} м²` : null],
+          ['Площадь участка', data.landArea ? `${data.landArea} га` : null],
           // Вид недвижимости — самого помещения, а не здания: гараж в жилом доме коммерческий.
           ['Тип недвижимости', data.type],
+          ['Назначение по документам', data.documentedUse],
+          // Стадия идёт до характеристик здания: «Проектирование» человек должен увидеть
+          // раньше, чем класс объекта и отопление, которых у участка ещё нет.
+          ['Стадия', data.constructionStage],
+          ['Плановый ввод', data.plannedCompletion],
+          ['Готовность', data.readinessPercent != null ? `${data.readinessPercent}%` : null],
           // Дальше — про здание, в котором оно находится.
           ['Город', data.city],
           ['Год постройки', data.year],
           ['Застройщик', data.developer],
           ['Этажность здания', data.floors],
+          ['Класс объекта', data.buildingClass],
+          ['Материал', data.wallMaterial],
+          ['Отопление', data.heating],
+          ['Лифт', data.elevator],
+          ['Охрана', data.security],
+          ['Парковка', data.parking],
           ['Адрес', data.address],
+          ['Идент. код участка', data.landPlotCode],
+          ['Кадастровый номер', data.cadastralNumber],
+          // Только результат состоявшейся проверки: «не проверяли» строкой не показываем,
+          // иначе молчание Кадастра читается как подтверждённая чистота объекта.
+          [
+            'Обременения',
+            data.isFreeOfEncumbrances === true
+              ? 'Не зарегистрированы'
+              : data.isFreeOfEncumbrances === false
+                ? 'Есть обременение'
+                : null,
+          ],
         ]
   ).filter(([, v]) => v != null)
 
