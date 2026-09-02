@@ -24,6 +24,14 @@ const UNIT_TYPES = {
   other: 'Помещение',
 }
 
+// Периодичность выплат. Показывается только по выпуску, который уже платит.
+const PAYOUT_FREQUENCIES = {
+  monthly: 'Ежемесячно',
+  quarterly: 'Ежеквартально',
+  annually: 'Раз в год',
+  none: 'Без выплат',
+}
+
 // Стадия строительства. Участок на стадии проектирования без этой подписи читается как
 // готовое здание — это раскрытие, а не оформление карточки.
 const CONSTRUCTION_STAGES = {
@@ -105,6 +113,16 @@ export default function DetailsModal({ property, onClose, isBuilding = false, on
       documents,
       currency,
       tokenPrice: Number(property.tokenPrice) || 0,
+      // Параметры выпуска, по которым человек и принимает решение.
+      minPurchaseTokens: Number(property.minPurchaseTokens) > 0 ? Number(property.minPurchaseTokens) : null,
+      minPurchaseAmount: Number(property.minPurchaseAmount) > 0 ? Number(property.minPurchaseAmount) : null,
+      offeredArea: Number(property.offeredAreaSqM) > 0 ? Number(property.offeredAreaSqM) : null,
+      areaPerToken: Number(property.areaPerTokenSqM) > 0 ? Number(property.areaPerTokenSqM) : null,
+      // Периодичность — только если выпуск действительно платит. distributesYet считает бэкенд:
+      // до ввода в эксплуатацию он false, какую бы частоту ни завели в админке.
+      payoutFrequency: property.distributesYet === true
+        ? PAYOUT_FREQUENCIES[property.payoutFrequency] || null
+        : null,
       total,
       available,
       description: pick(property, ['description']),
@@ -184,12 +202,24 @@ export default function DetailsModal({ property, onClose, isBuilding = false, on
           ['Комнатность', data.roomCount ? `${data.roomCount}-комнатная` : null],
           ['Общая площадь', data.totalArea ? `${area(data.totalArea)} м²` : null],
           ['Полезная площадь', data.usableArea ? `${area(data.usableArea)} м²` : null],
+          ['Выпускается', data.offeredArea ? `${area(data.offeredArea)} м²` : null],
           ['Площадь участка', data.landArea ? `${data.landArea} га` : null],
           // Вид недвижимости — самого помещения, а не здания: гараж в жилом доме коммерческий.
           ['Тип недвижимости', data.type],
           ['Назначение по документам', data.documentedUse],
           // Стадия идёт до характеристик здания: «Проектирование» человек должен увидеть
           // раньше, чем класс объекта и отопление, которых у участка ещё нет.
+          // Условия входа — то, ради чего человек и открыл карточку. Доля неделима, поэтому
+          // минимум задан в долях, а сумма показана как производная от них.
+          ['Минимальный вход', data.minPurchaseTokens
+            ? `${data.minPurchaseTokens.toLocaleString('ru-RU')} дол.`
+              + (data.minPurchaseAmount ? ` (${fmt(data.minPurchaseAmount)} ${data.currency})` : '')
+            : null],
+          // Эквивалент, а не единица выпуска: покупается доля выпуска, а не квадратный метр.
+          ['Эквивалент доли', data.areaPerToken
+            ? `≈ ${data.areaPerToken.toLocaleString('ru-RU', { maximumFractionDigits: 4 })} м²`
+            : null],
+          ['Периодичность выплат', data.payoutFrequency],
           ['Стадия', data.constructionStage],
           ['Плановый ввод', data.plannedCompletion],
           ['Готовность', data.readinessPercent != null ? `${data.readinessPercent}%` : null],
