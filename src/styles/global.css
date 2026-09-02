@@ -4210,6 +4210,21 @@ body::after {
   flex: 1;
   word-break: break-word;
 }
+/* Вид документа — между именем и «Открыть». Не сжимается: подпись из двух слов важнее,
+   чем лишние пиксели под длинное имя файла. */
+.details-doc-kind {
+  flex: 0 0 auto;
+  padding: 0.2em 0.55em;
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--amber-deep, var(--amber));
+  background: color-mix(in srgb, var(--amber) 12%, transparent);
+  white-space: nowrap;
+}
+
 .details-doc-open {
   flex: 0 0 auto;
   font-family: var(--font-mono);

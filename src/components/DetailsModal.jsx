@@ -33,6 +33,17 @@ const IMAGE_KIND_LABELS = {
   site_plan: 'Генплан',
 }
 
+// Вид документа. 'unspecified' и незнакомые значения — без подписи: лучше документ без метки,
+// чем метка, которой человек не поверит.
+const DOCUMENT_KIND_LABELS = {
+  legal: 'Юридический',
+  technical_passport: 'Техпаспорт',
+  valuation: 'Оценка',
+  collateral: 'Залог',
+  construction_schedule: 'График работ',
+  layout: 'Планировки',
+}
+
 // Периодичность выплат. Показывается только по выпуску, который уже платит.
 const PAYOUT_FREQUENCIES = {
   monthly: 'Ежемесячно',
@@ -466,7 +477,14 @@ export default function DetailsModal({ property, onClose, isBuilding = false, on
                       <svg className="details-doc-icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
                         <path d="M14 3H7a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7l-4-4zM14 3v4h4M9 13h6M9 17h6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
                       </svg>
-                      <span className="details-doc-name">{doc.fileName || `Документ ${i + 1}`}</span>
+                      <span className="details-doc-name">
+                        {doc.displayName || doc.fileName || `Документ ${i + 1}`}
+                      </span>
+                      {/* Вид документа: техпаспорт и график работ человек ищет по виду,
+                          а не по имени файла, которое дал сканер. */}
+                      {DOCUMENT_KIND_LABELS[doc.category] && (
+                        <span className="details-doc-kind">{DOCUMENT_KIND_LABELS[doc.category]}</span>
+                      )}
                       <span className="details-doc-open" aria-hidden="true">Открыть ↗</span>
                     </a>
                   ))}
