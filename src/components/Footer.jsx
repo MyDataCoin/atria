@@ -1,5 +1,4 @@
-import { useEffect, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useState } from 'react'
 import { useContent } from '../i18n.jsx'
 import { PRIVACY_POLICY } from '../content.policy.js'
 import { CONSENT_FORM } from '../content.consent.js'
@@ -7,77 +6,8 @@ import { TERMS_OF_SERVICE } from '../content.tos.js'
 import { WHITE_PAPER } from '../content.whitepaper.js'
 import DocModal from './DocModal.jsx'
 
-const EASE = [0.16, 1, 0.3, 1]
-
-const LICENSES = {
-  1: {
-    title: 'Лицензия №1',
-    badge: 'СРНФП · в процессе',
-    body: 'Оператор платформы ATRIA проходит лицензирование в Службе по регулированию небанковских финансовых организаций при Министерстве финансов Кыргызской Республики (СРНФП) на осуществление деятельности оператора виртуальных активов в соответствии с Законом КР №12 «О виртуальных активах».',
-    note: 'Статус: заявка на лицензирование подана, рассмотрение в процессе.',
-  },
-  2: {
-    title: 'Лицензия №2',
-    badge: 'СРНФП · в процессе',
-    body: 'Оператор платформы ATRIA проходит лицензирование на осуществление деятельности по выпуску и обращению токенов, обеспеченных недвижимым имуществом, под надзором СРНФП в рамках пилотного режима, предусмотренного Законом КР №12 «О виртуальных активах».',
-    note: 'Статус: заявка на лицензирование подана, рассмотрение в процессе.',
-  },
-}
-
-function LicenseModal({ licenseId, onClose }) {
-  const license = licenseId ? LICENSES[licenseId] : null
-
-  useEffect(() => {
-    if (!license) return
-    document.body.style.overflow = 'hidden'
-    const onKey = (e) => { if (e.key === 'Escape') onClose?.() }
-    window.addEventListener('keydown', onKey)
-    return () => {
-      document.body.style.overflow = ''
-      window.removeEventListener('keydown', onKey)
-    }
-  }, [license, onClose])
-
-  return (
-    <AnimatePresence>
-      {license && (
-        <motion.div
-          className="lic-overlay"
-          data-lenis-prevent
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.3, ease: EASE }}
-          onMouseDown={(e) => { if (e.target === e.currentTarget) onClose?.() }}
-        >
-          <motion.div
-            className="lic-card"
-            initial={{ opacity: 0, y: 20, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 14, scale: 0.97 }}
-            transition={{ duration: 0.4, ease: EASE }}
-            role="dialog"
-            aria-modal="true"
-          >
-            <button className="lic-close" onClick={onClose} aria-label="Закрыть">
-              <svg viewBox="0 0 24 24" width="16" height="16">
-                <path d="M5 5L19 19M19 5L5 19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-              </svg>
-            </button>
-            <span className="lic-badge mono">{license.badge}</span>
-            <h2 className="lic-title display">{license.title}</h2>
-            <p className="lic-body">{license.body}</p>
-            <p className="lic-note mono">{license.note}</p>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
-  )
-}
-
 export default function Footer() {
   const footer = useContent().footer
-  const [licenseId, setLicenseId] = useState(null)
   const [openDoc, setOpenDoc] = useState(null)
 
   const companyCol = footer.cols.find((c) => /компан/i.test(c.h)) || footer.cols[footer.cols.length - 1]
@@ -85,8 +15,6 @@ export default function Footer() {
   const companyLinks = rawLinks.filter((l) => !/карьера/i.test(l)).map((l) => ({ label: l }))
   const allLinks = [
     ...companyLinks,
-    { label: 'Лицензия №1', licenseId: 1 },
-    { label: 'Лицензия №2', licenseId: 2 },
     { label: 'White Paper', doc: WHITE_PAPER },
     { label: 'Пользовательское соглашение', doc: TERMS_OF_SERVICE },
     { label: 'Политика конфиденциальности', doc: PRIVACY_POLICY },
@@ -112,18 +40,6 @@ export default function Footer() {
               <div className="footer-col footer-col--company">
                 <h5>{companyCol.h}</h5>
                 {allLinks.map((item) => {
-                  if (item.licenseId) {
-                    return (
-                      <button
-                        type="button"
-                        className="tlink footer-link-btn"
-                        key={item.label}
-                        onClick={() => setLicenseId(item.licenseId)}
-                      >
-                        {item.label}
-                      </button>
-                    )
-                  }
                   if (item.doc) {
                     return (
                       <button
@@ -174,7 +90,6 @@ export default function Footer() {
 
       </div>
 
-      <LicenseModal licenseId={licenseId} onClose={() => setLicenseId(null)} />
       <DocModal doc={openDoc} onClose={() => setOpenDoc(null)} />
     </footer>
   )
