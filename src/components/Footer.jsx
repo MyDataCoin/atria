@@ -6,7 +6,7 @@ export default function Footer() {
 
   const companyCol = footer.cols.find((c) => /компан/i.test(c.h)) || footer.cols[footer.cols.length - 1]
   const rawLinks = companyCol ? companyCol.links : []
-  const companyLinks = rawLinks.filter((l) => !/карьера/i.test(l)).map((l) => ({ label: l, href: '/#top' }))
+  const companyLinks = rawLinks.filter((l) => !/карьера|юридическая информация/i.test(l)).map((l) => ({ label: l, href: '/#top' }))
   // У каждого документа своя страница (atria.kg/privacy-policy и т.п.).
   const allLinks = [
     ...companyLinks,
