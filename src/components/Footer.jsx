@@ -1,24 +1,16 @@
-import { useState } from 'react'
 import { useContent } from '../i18n.jsx'
-import { PRIVACY_POLICY } from '../content.policy.js'
-import { CONSENT_FORM } from '../content.consent.js'
-import { TERMS_OF_SERVICE } from '../content.tos.js'
-import { WHITE_PAPER } from '../content.whitepaper.js'
-import DocModal from './DocModal.jsx'
+import { DOC_PAGES } from '../docs.js'
 
 export default function Footer() {
   const footer = useContent().footer
-  const [openDoc, setOpenDoc] = useState(null)
 
   const companyCol = footer.cols.find((c) => /компан/i.test(c.h)) || footer.cols[footer.cols.length - 1]
   const rawLinks = companyCol ? companyCol.links : []
-  const companyLinks = rawLinks.filter((l) => !/карьера/i.test(l)).map((l) => ({ label: l }))
+  const companyLinks = rawLinks.filter((l) => !/карьера/i.test(l)).map((l) => ({ label: l, href: '/#top' }))
+  // У каждого документа своя страница (atria.kg/privacy-policy и т.п.).
   const allLinks = [
     ...companyLinks,
-    { label: 'White Paper', doc: WHITE_PAPER },
-    { label: 'Пользовательское соглашение', doc: TERMS_OF_SERVICE },
-    { label: 'Политика конфиденциальности', doc: PRIVACY_POLICY },
-    { label: 'Согласие на обработку данных', doc: CONSENT_FORM },
+    ...DOC_PAGES.map((p) => ({ label: p.label, href: p.path })),
   ]
 
   return (
@@ -39,25 +31,11 @@ export default function Footer() {
             {companyCol && (
               <div className="footer-col footer-col--company">
                 <h5>{companyCol.h}</h5>
-                {allLinks.map((item) => {
-                  if (item.doc) {
-                    return (
-                      <button
-                        type="button"
-                        className="tlink footer-link-btn"
-                        key={item.label}
-                        onClick={() => setOpenDoc(item.doc)}
-                      >
-                        {item.label}
-                      </button>
-                    )
-                  }
-                  return (
-                    <a href="#top" className="tlink" key={item.label}>
-                      {item.label}
-                    </a>
-                  )
-                })}
+                {allLinks.map((item) => (
+                  <a href={item.href} className="tlink" key={item.label}>
+                    {item.label}
+                  </a>
+                ))}
               </div>
             )}
           </div>
@@ -89,8 +67,6 @@ export default function Footer() {
         </div>
 
       </div>
-
-      <DocModal doc={openDoc} onClose={() => setOpenDoc(null)} />
     </footer>
   )
 }

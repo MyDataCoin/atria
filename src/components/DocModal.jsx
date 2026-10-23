@@ -67,6 +67,20 @@ function DocBlock({ block }) {
   return <p className="lic-doc-p">{block.p}</p>
 }
 
+// Тело документа (секции с блоками) — общее для модалки и отдельной страницы (DocPage).
+export function DocBody({ doc }) {
+  return (
+    <div className="lic-doc">
+      {doc.sections.map((section) => (
+        <section className="lic-doc-section" key={section.h}>
+          <h3 className="lic-doc-h">{section.h}</h3>
+          {section.blocks.map((block, i) => <DocBlock block={block} key={i} />)}
+        </section>
+      ))}
+    </div>
+  )
+}
+
 // Модалка юр-документа (политика / согласие / соглашение). doc — из content.*.js.
 export default function DocModal({ doc, onClose }) {
   useEffect(() => {
@@ -111,14 +125,7 @@ export default function DocModal({ doc, onClose }) {
             <h2 className="lic-title display">{doc.title}</h2>
             <p className="lic-body lic-doc-intro">{doc.intro}</p>
 
-            <div className="lic-doc">
-              {doc.sections.map((section) => (
-                <section className="lic-doc-section" key={section.h}>
-                  <h3 className="lic-doc-h">{section.h}</h3>
-                  {section.blocks.map((block, i) => <DocBlock block={block} key={i} />)}
-                </section>
-              ))}
-            </div>
+            <DocBody doc={doc} />
           </motion.div>
         </motion.div>
       )}

@@ -5,6 +5,8 @@ import Nav from './components/Nav.jsx'
 import ToTop from './components/ToTop.jsx'
 import BuildingHero from './components/BuildingHero.jsx'
 import Footer from './components/Footer.jsx'
+import DocPage from './components/DocPage.jsx'
+import { docPageFor } from './docs.js'
 
 import WhatIsAtria from './sections/WhatIsAtria.jsx'
 import RwaExplainer from './sections/RwaExplainer.jsx'
@@ -46,10 +48,25 @@ function Site() {
   )
 }
 
+// Страница юр-документа (/privacy-policy и т.п.). Роутер не нужен: ссылки футера — обычные
+// переходы, а nginx на любой адрес отдаёт index.html.
+function Doc({ page }) {
+  useSmoothScroll()
+  return (
+    <>
+      <Cursor />
+      <DocPage page={page} />
+      <Footer />
+      <ToTop />
+    </>
+  )
+}
+
 export default function App() {
+  const page = docPageFor(window.location.pathname)
   return (
     <LangProvider>
-      <Site />
+      {page ? <Doc page={page} /> : <Site />}
     </LangProvider>
   )
 }

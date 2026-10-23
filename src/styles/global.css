@@ -4526,3 +4526,24 @@ body::after {
 .contact-form textarea[aria-invalid='true'] {
   border-color: #b3432f;
 }
+
+/* ============================================================
+   DOC PAGE (/privacy-policy, /data-deletion и т.п.)
+   ============================================================ */
+.docpage {
+  background: var(--paper);
+  padding-block: clamp(3rem, 8vw, 6rem);
+}
+.docpage-inner {
+  max-width: calc(760px + 2 * var(--gutter));
+}
+.docpage-back {
+  display: block;
+  width: fit-content;
+  font-size: 0.85rem;
+  color: var(--ink-3);
+  margin-bottom: 2rem;
+}
+.docpage-title {
+  font-size: clamp(1.8rem, 4vw, 2.6rem);
+}
