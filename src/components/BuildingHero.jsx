@@ -124,7 +124,7 @@ export default function BuildingHero() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.9, ease: EASE, delay: 0.9 }}
             >
-              <a href="#cta" className="btn btn-primary magnetic">
+              <a href="#portfolio" className="btn btn-primary magnetic">
                 <span className="dot" />
                 <span>{hero.primary}</span>
               </a>

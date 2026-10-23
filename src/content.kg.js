@@ -1,6 +1,7 @@
 // Kyrgyz content — professional translation (workflow: translator + native Kyrgyz editor).
 // Missing/failed sections fall back to Russian via the spread below.
 import { ru } from './content.js'
+import { PHONE, EMAIL } from './company.js'
 
 const t = {
   "lang": "kg",
@@ -32,8 +33,8 @@ const t = {
         "href": "#faq"
       },
       {
-        "label": "Кайра байланыш",
-        "href": "#contact"
+        "label": "Байланыш",
+        "href": "/contacts"
       }
     ],
     "cta": "Баштоо"
@@ -802,9 +803,14 @@ const t = {
   "contact": {
     "surface": "bone",
     "id": "contact",
-    "eyebrow": "КАЙРА БАЙЛАНЫШ",
+    "eyebrow": "БАЙЛАНЫШ",
     "headline": "Суроо калдыбы? *Жазыңыз*",
     "subhead": "Шаблон эмес, тирүү адам жооп берет. Суроо конкреттүү объект же эсептөө боюнча болсо, ошондой жазыңыз — сандар менен түшүндүрөбүз.",
+    "details": [
+      { "label": "Телефон", "value": PHONE.display, "href": PHONE.tel && `tel:${PHONE.tel}` },
+      { "label": "E-mail", "value": EMAIL, "href": `mailto:${EMAIL}` },
+      { "label": "Юридикалык дареги", "value": "Кыргыз Республикасы, Бишкек ш., Ленин району, Шевченко көч., 125" }
+    ],
     "points": [
       "Жумуш күнүнүн ичинде жооп беребиз.",
       "Формадагы маалыматты сизге жооп берүү үчүн гана колдонобуз.",
@@ -870,7 +876,8 @@ const t = {
         ["Расмий тилдеги аталышы", "Общество с ограниченной ответственностью «АТРИА»"],
         ["Каттоо номери", "332603-3301-ООО"],
         ["ОКПО коду", "35166932"],
-        ["ИНН", "01108202610074"]
+        ["ИНН", "01108202610074"],
+        ["Юридикалык дареги", "Кыргыз Республикасы, Бишкек ш., Ленин району, Шевченко көч., 125"]
       ]
     },
     "bottomLeft": "© 2026 ATRIA — Кыргызстандын кыймылсыз мүлкүн токенизациялоо",

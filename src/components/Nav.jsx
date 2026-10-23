@@ -9,6 +9,10 @@ import { DASHBOARD_URL } from '../lib/dashboard.js'
 
 const EASE = [0.16, 1, 0.3, 1]
 
+// Якоря (#how и т.п.) есть только на лендинге — с других страниц (/contacts) ведём туда.
+const ON_LANDING = window.location.pathname === '/'
+const linkHref = (href) => (!ON_LANDING && href.startsWith('#') ? `/${href}` : href)
+
 export default function Nav() {
   const data = useContent()
   const nav = data.nav
@@ -129,13 +133,13 @@ export default function Nav() {
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 1, ease: EASE, delay: 0.2 }}
       >
-        <a href="#top" className="nav-brand magnetic" aria-label="ATRIA" onClick={closeMenu}>
+        <a href={linkHref('#top')} className="nav-brand magnetic" aria-label="ATRIA" onClick={closeMenu}>
           <img src="/atria-logo.png" alt="ATRIA" className="nav-logo" />
         </a>
 
         <div className="nav-links">
           {nav.links.map((l) => (
-            <a key={l.href} href={l.href} className="tlink">
+            <a key={l.href} href={linkHref(l.href)} className="tlink">
               {l.label}
             </a>
           ))}
@@ -201,7 +205,7 @@ export default function Nav() {
             >
               <div className="mobile-menu-links">
                 {nav.links.map((l) => (
-                  <a key={l.href} href={l.href} className="mobile-link" onClick={closeMenu}>
+                  <a key={l.href} href={linkHref(l.href)} className="mobile-link" onClick={closeMenu}>
                     {l.label}
                   </a>
                 ))}

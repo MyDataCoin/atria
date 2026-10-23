@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { LangProvider } from './i18n.jsx'
 import { useSmoothScroll } from './lib/smooth.js'
 import Cursor from './components/Cursor.jsx'
@@ -18,7 +19,6 @@ import Compare from './sections/Compare.jsx'
 import TrustLegal from './sections/TrustLegal.jsx'
 import Risks from './sections/Risks.jsx'
 import Faq from './sections/Faq.jsx'
-import FinalCta from './sections/FinalCta.jsx'
 import Contact from './sections/Contact.jsx'
 
 function Site() {
@@ -39,7 +39,24 @@ function Site() {
         <TrustLegal />
         <Risks />
         <Faq />
-        <FinalCta />
+      </main>
+      <Footer />
+      <ToTop />
+    </>
+  )
+}
+
+// Страница «Контакты» (/contacts) — форма обратной связи, вынесенная с лендинга.
+function Contacts() {
+  useSmoothScroll()
+  useEffect(() => {
+    document.title = 'Контакты — ATRIA'
+  }, [])
+  return (
+    <>
+      <Cursor />
+      <Nav />
+      <main>
         <Contact />
       </main>
       <Footer />
@@ -62,11 +79,17 @@ function Doc({ page }) {
   )
 }
 
+function Page() {
+  const path = window.location.pathname.replace(/\/+$/, '').toLowerCase()
+  if (path === '/contacts') return <Contacts />
+  const page = docPageFor(path)
+  return page ? <Doc page={page} /> : <Site />
+}
+
 export default function App() {
-  const page = docPageFor(window.location.pathname)
   return (
     <LangProvider>
-      {page ? <Doc page={page} /> : <Site />}
+      <Page />
     </LangProvider>
   )
 }

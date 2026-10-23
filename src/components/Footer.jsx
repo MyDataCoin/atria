@@ -1,12 +1,15 @@
 import { useContent } from '../i18n.jsx'
 import { DOC_PAGES } from '../docs.js'
+import { PHONE, EMAIL, ADDRESS_SHORT } from '../company.js'
 
 export default function Footer() {
   const footer = useContent().footer
 
   const companyCol = footer.cols.find((c) => /компан/i.test(c.h)) || footer.cols[footer.cols.length - 1]
   const rawLinks = companyCol ? companyCol.links : []
-  const companyLinks = rawLinks.filter((l) => !/карьера|юридическая информация/i.test(l)).map((l) => ({ label: l, href: '/#top' }))
+  const companyLinks = rawLinks
+    .filter((l) => !/карьера|юридическая информация/i.test(l))
+    .map((l) => ({ label: l, href: /контакт/i.test(l) ? '/contacts' : '/#top' }))
   // У каждого документа своя страница (atria.kg/privacy-policy и т.п.).
   const allLinks = [
     ...companyLinks,
@@ -61,8 +64,12 @@ export default function Footer() {
         <div className="footer-bottom">
           <span>{footer.bottomLeft}</span>
           <span className="footer-contact">
-            Бишкек&nbsp;•&nbsp;
-            <a href="mailto:hello@atria.kg" className="footer-email">hello@atria.kg</a>
+            {ADDRESS_SHORT}&nbsp;•&nbsp;
+            {PHONE.tel
+              ? <a href={`tel:${PHONE.tel}`} className="footer-email">{PHONE.display}</a>
+              : PHONE.display}
+            &nbsp;•&nbsp;
+            <a href={`mailto:${EMAIL}`} className="footer-email">{EMAIL}</a>
           </span>
         </div>
 

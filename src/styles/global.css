@@ -1552,8 +1552,9 @@ body::after {
   color: rgba(255, 255, 255, 0.45);
 }
 
+/* адрес • телефон • почта — на узком экране переносится, а не вылезает за край */
 .footer-contact {
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .footer-email {
@@ -4401,6 +4402,27 @@ body::after {
   .contact-rail {
     position: static;
   }
+}
+.contact-details {
+  margin: 1.8rem 0 0;
+  border-top: 1px solid var(--line);
+}
+.contact-details-row {
+  padding: 0.9rem 0;
+  border-bottom: 1px solid var(--line);
+}
+.contact-details-row dt {
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--amber-deep, var(--amber));
+  margin-bottom: 0.3rem;
+}
+.contact-details-row dd {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: var(--ink);
 }
 .contact-points {
   list-style: none;

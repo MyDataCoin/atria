@@ -1,6 +1,7 @@
 // Russian content. The whole site reads the active-language object via useContent().
 // Logic-coupled values use stable keys (statusKey, groupKey, filter.key, period) so
 // switching language never breaks filtering/branching.
+import { PHONE, EMAIL } from './company.js'
 
 export const ru = {
   lang: 'ru',
@@ -17,7 +18,7 @@ export const ru = {
       { label: 'Калькулятор', href: '#calc' },
       { label: 'Объекты', href: '#portfolio' },
       { label: 'FAQ', href: '#faq' },
-      { label: 'Обратная связь', href: '#contact' },
+      { label: 'Контакты', href: '/contacts' },
     ],
     cta: 'Начать',
   },
@@ -640,10 +641,15 @@ export const ru = {
   contact: {
     surface: 'bone',
     id: 'contact',
-    eyebrow: 'ОБРАТНАЯ СВЯЗЬ',
+    eyebrow: 'КОНТАКТЫ',
     headline: 'Остался вопрос? *Напишите* нам',
     subhead:
       'Ответим человеком, а не шаблоном. Если вопрос про конкретный объект или расчёт — так и напишите, разберём на цифрах.',
+    details: [
+      { label: 'Телефон', value: PHONE.display, href: PHONE.tel && `tel:${PHONE.tel}` },
+      { label: 'E-mail', value: EMAIL, href: `mailto:${EMAIL}` },
+      { label: 'Юридический адрес', value: 'Кыргызская Республика, г. Бишкек, Ленинский район, ул. Шевченко, 125' },
+    ],
     points: [
       'Отвечаем в течение рабочего дня.',
       'Данные из формы используем только чтобы ответить вам.',
@@ -694,6 +700,7 @@ export const ru = {
         ['Регистрационный номер', '332603-3301-ООО'],
         ['Код ОКПО', '35166932'],
         ['ИНН', '01108202610074'],
+        ['Юридический адрес', 'Кыргызская Республика, г. Бишкек, Ленинский район, ул. Шевченко, 125'],
       ],
     },
     bottomLeft: '© 2026 ATRIA — Токенизация недвижимости Кыргызстана',

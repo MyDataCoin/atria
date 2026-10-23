@@ -97,6 +97,16 @@ export default function Contact() {
             <Accent text={c.headline} />
           </h2>
           <p className="s-sub">{c.subhead}</p>
+          {c.details && (
+            <dl className="contact-details">
+              {c.details.map((d) => (
+                <div className="contact-details-row" key={d.label}>
+                  <dt className="mono">{d.label}</dt>
+                  <dd>{d.href ? <a href={d.href} className="tlink">{d.value}</a> : d.value}</dd>
+                </div>
+              ))}
+            </dl>
+          )}
           <ul className="contact-points">
             {c.points.map((p) => (
               <li key={p}>{p}</li>
