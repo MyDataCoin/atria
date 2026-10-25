@@ -61,14 +61,18 @@ const CONSTRUCTION_STAGES = {
   commissioned: 'Введён в эксплуатацию',
 }
 
-// Дата ввода — только месяц и год: точный день до получения проектной документации никто
-// не назовёт, а показанный день читается как обязательство.
-const plannedDate = (value) => {
+const QUARTERS = ['I', 'II', 'III', 'IV']
+
+// Дата ввода — не точнее, чем её назвал застройщик, и не точнее месяца: точный день до
+// получения проектной документации никто не назовёт, а показанный день читается как обязательство.
+const plannedDate = (value, precision) => {
   if (!value) return null
   const d = new Date(value)
-  return Number.isNaN(d.getTime())
-    ? null
-    : d.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })
+  if (Number.isNaN(d.getTime())) return null
+  const year = d.getUTCFullYear()
+  if (precision === 'year') return String(year)
+  if (precision === 'quarter') return `${QUARTERS[Math.floor(d.getUTCMonth() / 3)]} квартал ${year}`
+  return d.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric', timeZone: 'UTC' })
 }
 
 // Берём первое непустое значение из возможных имён поля (бэкенд может ещё не отдавать часть).
@@ -172,12 +176,13 @@ export default function DetailsModal({ property, onClose, isBuilding = false, on
       elevator: pick(property, ['elevator']),
       security: pick(property, ['security']),
       parking: pick(property, ['parking']),
+      managementCompany: pick(property, ['managementCompany']),
       // Участок и стройка.
       landArea: Number(property.landAreaHectares) > 0 ? Number(property.landAreaHectares) : null,
       landPlotCode: pick(property, ['landPlotCode']),
       cadastralNumber: pick(property, ['cadastralNumber']),
       constructionStage: CONSTRUCTION_STAGES[property.constructionStage] || null,
-      plannedCompletion: plannedDate(property.plannedCompletionDate),
+      plannedCompletion: plannedDate(property.plannedCompletionDate, property.plannedCompletionPrecision),
       readinessPercent: property.readinessPercent ?? null,
       // Проверка Кадастра. null — не проверяли, и на витрине это молчание, а не «свободен»:
       // утверждать чистоту объекта, которую никто не проверял, нельзя.
@@ -256,6 +261,7 @@ export default function DetailsModal({ property, onClose, isBuilding = false, on
           ['Лифт', data.elevator],
           ['Охрана', data.security],
           ['Парковка', data.parking],
+          ['Управляющая компания', data.managementCompany],
           ['Адрес', data.address],
           ['Идент. код участка', data.landPlotCode],
           ['Кадастровый номер', data.cadastralNumber],
