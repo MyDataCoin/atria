@@ -63,6 +63,13 @@ const CONSTRUCTION_STAGES = {
 
 const QUARTERS = ['I', 'II', 'III', 'IV']
 
+const AMENITY_LABELS = {
+  hasElevator: 'лифт',
+  hasHeating: 'отопление',
+  hasSecurity: 'охрана',
+  hasParking: 'парковка',
+}
+
 // Дата ввода — не точнее, чем её назвал застройщик, и не точнее месяца: точный день до
 // получения проектной документации никто не назовёт, а показанный день читается как обязательство.
 const plannedDate = (value, precision) => {
@@ -157,7 +164,7 @@ export default function DetailsModal({ property, onClose, isBuilding = false, on
       // Блок о районе. Отдельно от описания: одно про объект, другое про то, что вокруг него.
       locationDescription: pick(property, ['locationDescription']),
       // Характеристики объекта из PropertyDto.
-      type: pick(property, ['propertyType', 'type']),
+      type: pick(property, ['propertyType', 'buildingType', 'type']),
       city: pick(property, ['city']),
       year: pick(property, ['yearBuilt', 'buildYear', 'year']),
       developer: pick(property, ['developer', 'builder', 'contractor']),
@@ -181,6 +188,11 @@ export default function DetailsModal({ property, onClose, isBuilding = false, on
       security: pick(property, ['security']),
       parking: pick(property, ['parking']),
       managementCompany: pick(property, ['managementCompany']),
+      // Галочки здания (BuildingDto): отмечено — есть или предусмотрено проектом. Неотмеченное
+      // не показываем: «не указано» не значит «нет».
+      amenities: ['hasElevator', 'hasHeating', 'hasSecurity', 'hasParking']
+        .filter((k) => property[k] === true)
+        .map((k) => AMENITY_LABELS[k]),
       // Участок и стройка.
       landArea: Number(property.landAreaHectares) > 0 ? Number(property.landAreaHectares) : null,
       landPlotCode: pick(property, ['landPlotCode']),
@@ -215,11 +227,31 @@ export default function DetailsModal({ property, onClose, isBuilding = false, on
       ? [
           // У здания своих «этажа» и «комнатности» нет — только про сам дом.
           ['Тип недвижимости', data.type],
+          // Построено или строится — то, что админ отмечает в блоке застройки.
+          ['Здание', property.constructionStage === 'commissioned'
+            ? 'Построено'
+            : data.constructionStage ? 'Строится' : null],
+          ['Стадия стройки', property.constructionStage !== 'commissioned' ? data.constructionStage : null],
+          ['Окончание стройки', property.constructionStage !== 'commissioned' ? data.plannedCompletion : null],
           ['Город', data.city],
           ['Год постройки', data.year],
           ['Застройщик', data.developer],
           ['Этажность', data.floors],
+          ['Общая площадь здания', data.totalArea ? `${area(data.totalArea)} м²` : null],
+          [property.constructionStage === 'commissioned' ? 'В здании есть' : 'Предусмотрено проектом',
+            data.amenities.length
+              ? data.amenities.join(', ').replace(/^./, (c) => c.toUpperCase())
+              : null],
           ['Адрес', data.address],
+          // Как и у помещения: только состоявшаяся проверка, «не проверяли» не показываем.
+          [
+            'Обременения',
+            data.isFreeOfEncumbrances === true
+              ? 'Не зарегистрированы'
+              : data.isFreeOfEncumbrances === false
+                ? 'Есть обременение'
+                : null,
+          ],
           ['Помещений в продаже', data.units.length || null],
         ]
       : [
