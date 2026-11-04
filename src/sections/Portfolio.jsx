@@ -107,31 +107,6 @@ function fromApi(dto, i, ui, filters) {
   }
 }
 
-/** Статический элемент контента → та же вью-модель (используется как fallback при ошибке). */
-function fromStatic(p, ui) {
-  return {
-    id: p.name,
-    name: p.name,
-    loc: p.district,
-    type: p.type,
-    img: p.img,
-    bg: p.bg,
-    metrics: [
-      { k: ui.mPrice, v: p.price, unit: true },
-      { k: ui.mArea, v: p.area },
-      { k: ui.mOcc, v: `${p.occupancy}%` },
-      { k: ui.mBought, v: `${p.bought}%` },
-    ],
-    bought: p.bought,
-    statusKey: p.statusKey,
-    status: p.status,
-    details: [
-      { k: ui.tenants, v: p.tenants },
-      { k: ui.spv, v: p.spv },
-    ],
-  }
-}
-
 function PCard({ p, i, ui, onBuy, onDetails }) {
   const [open, setOpen] = useState(false)
   const hasDetails = p.details && p.details.length > 0
@@ -373,12 +348,10 @@ export default function Portfolio() {
       })
       .catch(() => {
         if (!alive) return
-        // Бэкенд недоступен — показываем статические объекты как запасной вариант.
-        setState({
-          status: 'error',
-          groups: [],
-          loose: (c.items || []).map((p) => fromStatic(p, ui)),
-        })
+        // Бэкенд недоступен — только сообщение об ошибке. Раньше здесь подставлялись три
+        // выдуманных объекта со стоковыми фото, ценами и «Открыт к покупке»: на витрине это
+        // выглядит как реальное предложение, которого нет.
+        setState({ status: 'error', groups: [], loose: [] })
       })
     return () => {
       alive = false

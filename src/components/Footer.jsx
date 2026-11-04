@@ -8,8 +8,12 @@ export default function Footer() {
   const companyCol = footer.cols.find((c) => /компан/i.test(c.h)) || footer.cols[footer.cols.length - 1]
   const rawLinks = companyCol ? companyCol.links : []
   const companyLinks = rawLinks
-    .filter((l) => !/карьера|юридическая информация/i.test(l))
-    .map((l) => ({ label: l, href: /контакт/i.test(l) ? '/contacts' : '/#top' }))
+    .filter((l) => !/карьера|юридическая информация|юридикалык маалымат/i.test(l))
+    // «О ATRIA» (кырг. «ATRIA жөнүндө») — на блок «Что такое ATRIA», а не в начало главной.
+    .map((l) => ({
+      label: l,
+      href: /контакт|байланыш/i.test(l) ? '/contacts' : /о atria|жөнүндө/i.test(l) ? '/#what' : '/#top',
+    }))
   // У каждого документа своя страница (atria.kg/privacy-policy и т.п.).
   const allLinks = [
     ...companyLinks,
