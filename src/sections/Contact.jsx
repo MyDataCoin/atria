@@ -102,7 +102,18 @@ export default function Contact() {
               {c.details.map((d) => (
                 <div className="contact-details-row" key={d.label}>
                   <dt className="mono">{d.label}</dt>
-                  <dd>{d.href ? <a href={d.href} className="tlink">{d.value}</a> : d.value}</dd>
+                  <dd>
+                    {d.href ? (
+                      // Внешние ссылки (WhatsApp) — в новой вкладке, чтобы человек не терял сайт.
+                      <a
+                        href={d.href}
+                        className="tlink"
+                        {...(d.href.startsWith('http') ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+                      >
+                        {d.value}
+                      </a>
+                    ) : d.value}
+                  </dd>
                 </div>
               ))}
             </dl>

@@ -1,7 +1,7 @@
 // Russian content. The whole site reads the active-language object via useContent().
 // Logic-coupled values use stable keys (statusKey, groupKey, filter.key, period) so
 // switching language never breaks filtering/branching.
-import { PHONE, EMAIL } from './company.js'
+import { PHONE, WHATSAPP, EMAIL } from './company.js'
 
 export const ru = {
   lang: 'ru',
@@ -589,6 +589,7 @@ export const ru = {
       'Ответим человеком, а не шаблоном. Если вопрос про конкретный объект или расчёт — так и напишите, разберём на цифрах.',
     details: [
       { label: 'Телефон', value: PHONE.display, href: PHONE.tel && `tel:${PHONE.tel}` },
+      { label: 'WhatsApp', value: WHATSAPP.display, href: WHATSAPP.href },
       { label: 'E-mail', value: EMAIL, href: `mailto:${EMAIL}` },
       { label: 'Юридический адрес', value: 'Кыргызская Республика, г. Бишкек, Ленинский район, ул. Шевченко, 125' },
     ],

@@ -1,6 +1,6 @@
 import { useContent } from '../i18n.jsx'
 import { DOC_PAGES } from '../docs.js'
-import { PHONE, EMAIL, ADDRESS_SHORT } from '../company.js'
+import { PHONE, WHATSAPP, EMAIL, ADDRESS_SHORT } from '../company.js'
 
 export default function Footer() {
   const footer = useContent().footer
@@ -72,6 +72,8 @@ export default function Footer() {
             {PHONE.tel
               ? <a href={`tel:${PHONE.tel}`} className="footer-email">{PHONE.display}</a>
               : PHONE.display}
+            &nbsp;•&nbsp;
+            <a href={WHATSAPP.href} target="_blank" rel="noopener noreferrer" className="footer-email">WhatsApp</a>
             &nbsp;•&nbsp;
             <a href={`mailto:${EMAIL}`} className="footer-email">{EMAIL}</a>
           </span>

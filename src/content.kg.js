@@ -1,7 +1,7 @@
 // Kyrgyz content — professional translation (workflow: translator + native Kyrgyz editor).
 // Missing/failed sections fall back to Russian via the spread below.
 import { ru } from './content.js'
-import { PHONE, EMAIL } from './company.js'
+import { PHONE, WHATSAPP, EMAIL } from './company.js'
 
 const t = {
   "lang": "kg",
@@ -750,6 +750,7 @@ const t = {
     "subhead": "Шаблон эмес, тирүү адам жооп берет. Суроо конкреттүү объект же эсептөө боюнча болсо, ошондой жазыңыз — сандар менен түшүндүрөбүз.",
     "details": [
       { "label": "Телефон", "value": PHONE.display, "href": PHONE.tel && `tel:${PHONE.tel}` },
+      { "label": "WhatsApp", "value": WHATSAPP.display, "href": WHATSAPP.href },
       { "label": "E-mail", "value": EMAIL, "href": `mailto:${EMAIL}` },
       { "label": "Юридикалык дареги", "value": "Кыргыз Республикасы, Бишкек ш., Ленин району, Шевченко көч., 125" }
     ],
