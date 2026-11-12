@@ -8,4 +8,4 @@ export const WHATSAPP = { display: '+996 508 706 333', href: 'https://wa.me/9965
 
 export const EMAIL = 'hello@atria.kg'
 
-export const ADDRESS_SHORT = 'г. Бишкек, ул. Шевченко, 125'
+export const ADDRESS_SHORT = '720017, г. Бишкек, ул. Шевченко, 125'
