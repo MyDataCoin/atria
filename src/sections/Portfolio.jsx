@@ -123,7 +123,7 @@ function fromApi(dto, i, ui, filters) {
   }
 }
 
-function PCard({ p, i, ui, onBuy }) {
+function PCard({ p, i, ui, onBuy, inBuilding = false }) {
   const [open, setOpen] = useState(false)
   const hasDetails = p.details && p.details.length > 0
   // «Скоро» ещё нельзя купить — показываем только описание и «Подробнее»,
@@ -145,7 +145,9 @@ function PCard({ p, i, ui, onBuy }) {
           {p.raw ? <a href={unitHref(p.id)} className="pcard-link">{p.name}</a> : p.name}
         </h3>
         {p.unitLine && <span className="punit">{p.unitLine}</span>}
-        {p.type && <span className="ptype">{p.type}</span>}
+        {/* Описание помещения в здании — на его странице: в сетке карточек оно повторялось
+            почти дословно в каждой и только удлиняло список. */}
+        {p.type && !inBuilding && <span className="ptype">{p.type}</span>}
 
         {!isSoon && (
           <>
@@ -320,7 +322,7 @@ function BuildingGroup({ group, ui, onBuy }) {
           квартирами карточки заполняют ряд целиком, а не жмутся в две трети с дыркой справа. */}
       <div className="pgrid pgroup-grid" data-cols={Math.min(cards.length, 3)}>
         {cards.map((p, i) => (
-          <PCard key={p.id} p={p} i={i} ui={ui} onBuy={onBuy} />
+          <PCard key={p.id} p={p} i={i} ui={ui} onBuy={onBuy} inBuilding />
         ))}
       </div>
     </Reveal>
@@ -404,25 +406,37 @@ export default function Portfolio() {
     }
   }, [filter, state.groups, state.loose])
 
+  const presentStatuses = useMemo(
+    () => new Set([...state.groups.flatMap((g) => g.cards), ...state.loose].map((p) => p.statusKey)),
+    [state.groups, state.loose],
+  )
+  const statusCount = presentStatuses.size
+
   return (
     <section className={`section surface-${c.surface}`} id={c.id}>
       <div className="container">
         <SHead eyebrow={c.eyebrow} headline={c.headline} sub={c.subhead} />
 
-        <div className="chips">
-          {filters.map((f) => (
-            <button
-              key={f.key}
-              className={`chip-btn ${filter === f.key ? 'on' : ''}`}
-              onClick={() => setFilter(f.key)}
-            >
-              {f.label}
-            </button>
-          ))}
-          <span className="count">
-            {total} {ui.count}
-          </span>
-        </div>
+        {/* Фильтр по статусу нужен, только когда есть из чего выбирать: при одном статусе
+            у всех объектов это четыре кнопки, которые ничего не меняют. */}
+        {statusCount > 1 && (
+          <div className="chips">
+            {filters
+              .filter((f) => f.key === 'all' || presentStatuses.has(f.key))
+              .map((f) => (
+                <button
+                  key={f.key}
+                  className={`chip-btn ${filter === f.key ? 'on' : ''}`}
+                  onClick={() => setFilter(f.key)}
+                >
+                  {f.label}
+                </button>
+              ))}
+            <span className="count">
+              {total} {ui.count}
+            </span>
+          </div>
+        )}
 
         {state.status === 'loading' && <p className="s-note">{ui.loading}</p>}
         {state.status === 'error' && <p className="reg-error">{ui.errorText}</p>}
@@ -453,12 +467,14 @@ export default function Portfolio() {
 
         <PurchaseModal property={buying} onClose={() => setBuying(null)} />
 
-        <Reveal as="div" className="port-strip">
-          <p>
-            <Accent text={c.strip} />
-          </p>
-          <span className="ps-note">{c.stripNote}</span>
-        </Reveal>
+        {c.strip && (
+          <Reveal as="div" className="port-strip">
+            <p>
+              <Accent text={c.strip} />
+            </p>
+            {c.stripNote && <span className="ps-note">{c.stripNote}</span>}
+          </Reveal>
+        )}
 
         <p className="s-note">{c.microcopy}</p>
       </div>

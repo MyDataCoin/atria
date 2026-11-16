@@ -10,14 +10,8 @@ import DocPage from './components/DocPage.jsx'
 import { docPageFor } from './docs.js'
 import ObjectPage, { objectRouteFor } from './components/ObjectPage.jsx'
 
-import WhatIsAtria from './sections/WhatIsAtria.jsx'
-import RwaExplainer from './sections/RwaExplainer.jsx'
 import HowItWorks from './sections/HowItWorks.jsx'
-import IncomeEconomics from './sections/IncomeEconomics.jsx'
-import Calculator from './sections/Calculator.jsx'
 import Portfolio from './sections/Portfolio.jsx'
-import Compare from './sections/Compare.jsx'
-import TrustLegal from './sections/TrustLegal.jsx'
 import Risks from './sections/Risks.jsx'
 import Faq from './sections/Faq.jsx'
 import Contact from './sections/Contact.jsx'
@@ -30,14 +24,9 @@ function Site() {
       <Nav />
       <BuildingHero />
       <main>
-        <WhatIsAtria />
-        <RwaExplainer />
-        <HowItWorks />
-        <IncomeEconomics />
-        <Calculator />
+        {/* Только нужное: что купить, как, чем рискуете, ответы. Объекты — сразу после экрана. */}
         <Portfolio />
-        <Compare />
-        <TrustLegal />
+        <HowItWorks />
         <Risks />
         <Faq />
       </main>

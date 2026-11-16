@@ -22,7 +22,9 @@ export default function HowItWorks() {
           ))}
         </div>
 
+        {(c.example || c.risk) && (
         <div className="hw-cards">
+          {c.example && (
           <Reveal as="div" className="callout" style={{ boxShadow: 'none', background: 'var(--bone)' }}>
             <div>
               <span className="tag">{c.example.tag}</span>
@@ -30,11 +32,15 @@ export default function HowItWorks() {
             </div>
             <p>{c.example.text}</p>
           </Reveal>
+          )}
+          {c.risk && (
           <Reveal as="div" className="risk-card" delay={0.1}>
             <span className="tag">{c.risk.tag}</span>
             <p>{c.risk.text}</p>
           </Reveal>
+          )}
         </div>
+        )}
       </div>
     </section>
   )

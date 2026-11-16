@@ -46,7 +46,7 @@ export default function BuildingHero() {
   ]
 
   return (
-    <header className="bhero" ref={wrapRef} id="top" style={{ height: '300vh' }}>
+    <header className="bhero" ref={wrapRef} id="top" style={{ height: '180vh' }} /* было 300vh: до объектов листать почти вдвое меньше */>
       <div className="bhero-sticky">
         <div className="bhero-canvas">
           <Canvas

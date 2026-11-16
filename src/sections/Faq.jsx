@@ -18,7 +18,7 @@ export default function Faq() {
           <h2 className="s-h2" style={{ marginTop: '1rem' }}>
             <Accent text={c.headline} />
           </h2>
-          <p className="s-sub">{c.subhead}</p>
+          {c.subhead && <p className="s-sub">{c.subhead}</p>}
           <a
             href="/contacts"
             className="tlink"
@@ -35,6 +35,7 @@ export default function Faq() {
         </div>
 
         <div>
+          {c.tabs?.length > 0 && (
           <div className="faq-tabs">
             {c.tabs.map((t) => (
               <button
@@ -49,6 +50,7 @@ export default function Faq() {
               </button>
             ))}
           </div>
+          )}
 
           <div className="acc">
             {items.map((it, i) => {
@@ -82,7 +84,7 @@ export default function Faq() {
             })}
           </div>
 
-          <p className="s-note">{c.microcopy}</p>
+          {c.microcopy && <p className="s-note">{c.microcopy}</p>}
         </div>
       </div>
     </section>
