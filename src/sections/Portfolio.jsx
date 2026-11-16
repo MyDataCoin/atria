@@ -50,7 +50,8 @@ function unitLine(dto) {
   const land = Number(dto.landAreaHectares)
   return [
     UNIT_TYPES[dto.unitType] || null,
-    dto.unitNumber ? `№${dto.unitNumber}` : null,
+    // «Офис Г3 · №Г3» — номер уже в названии, второй раз его не повторяем.
+    dto.unitNumber && !String(dto.name || '').includes(dto.unitNumber) ? `№${dto.unitNumber}` : null,
     dto.roomCount ? `${dto.roomCount}-комн.` : null,
     Number.isFinite(area) && area > 0 ? `${area.toLocaleString('ru-RU')} м²` : null,
     Number.isFinite(land) && land > 0 ? `${land.toLocaleString('ru-RU')} га` : null,
@@ -60,6 +61,20 @@ function unitLine(dto) {
     .filter(Boolean)
     .join(' · ')
 }
+
+// Естественный порядок номеров: «Г2» раньше «Г10», «2» раньше «10». Без номера — в конец.
+const unitCollator = new Intl.Collator('ru', { numeric: true, sensitivity: 'base' })
+function byUnitNumber(a, b) {
+  const x = a?.unitNumber ?? ''
+  const y = b?.unitNumber ?? ''
+  if (!x && !y) return 0
+  if (!y) return -1
+  if (!x) return 1
+  return unitCollator.compare(String(x), String(y))
+}
+
+// Подпись на обложке карточки по виду картинки: рендер и план не должны выглядеть как фото.
+const COVER_KIND_LABELS = { render: 'Визуализация', floor_plan: 'План', site_plan: 'Генплан' }
 
 /** Метка статуса по ключу — берём из фильтров контента, чтобы не дублировать переводы. */
 function statusLabel(filters, key) {
@@ -101,7 +116,7 @@ function fromApi(dto, i, ui, filters) {
     status: statusLabel(filters, statusKey),
     salesPaused: dto.salesPaused === true, // продажи временно приостановлены (кнопка «Купить» блокируется)
     img: dto.images?.[0]?.url || undefined, // первая фотка — обложка карточки (иначе градиент)
-    imgIsRender: dto.images?.[0]?.kind === 'render', // рендер на обложке подписываем «Визуализация»
+    imgKindLabel: COVER_KIND_LABELS[dto.images?.[0]?.kind] || '', // «Визуализация» / «План» на обложке
     unitLine: unitLine(dto), // «Квартира №12 · 3-комн. · 128,82 м²» — пусто у самостоятельных выпусков
     details: [],
     raw: dto, // полный объект для модалки покупки
@@ -122,7 +137,7 @@ function PCard({ p, i, ui, onBuy, onDetails }) {
         style={p.img ? { backgroundImage: `url(${p.img})` } : { background: p.bg }}
       >
         <span className={`pcard-badge ${p.statusKey}`}>{p.status}</span>
-        {p.img && p.imgIsRender && <span className="img-render-tag">Визуализация</span>}
+        {p.img && p.imgKindLabel && <span className="img-render-tag">{p.imgKindLabel}</span>}
       </div>
       <div className="pcard-body">
         {!isSoon && p.loc && <span className="loc">{p.loc}</span>}
@@ -346,7 +361,10 @@ export default function Portfolio() {
           .filter((building) => !isDraft(building))
           .map((building) => ({
             building,
-            cards: visible(building.units).map((dto) => fromApi(dto, seq++, ui, filters)),
+            cards: visible(building.units)
+              // API отдаёт помещения в порядке заведения; на витрине — по номеру (Г1, Г2, … Г10).
+              .sort(byUnitNumber)
+              .map((dto) => fromApi(dto, seq++, ui, filters)),
           }))
           // Бэкенд уже не отдаёт публике здание, внутри которого нечего показывать; этот фильтр
           // оставлен как страховка — и на случай, когда страницу открывает сотрудник, которому
