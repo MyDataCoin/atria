@@ -138,10 +138,12 @@ export default function BuildingHero() {
             <div className="bhero-progress" aria-hidden="true">
               <motion.i style={{ scaleX: barScale }} />
             </div>
-            <div className="bhero-readout">
-              <span className="big">{hero.readout.big}</span>
-              <span>{hero.readout.label}</span>
-            </div>
+            {hero.readout?.big && (
+              <div className="bhero-readout">
+                <span className="big">{hero.readout.big}</span>
+                <span>{hero.readout.label}</span>
+              </div>
+            )}
           </div>
         </div>
       </div>
