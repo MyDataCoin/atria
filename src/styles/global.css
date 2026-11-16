@@ -4660,3 +4660,31 @@ a.details-unit {
   color: inherit;
   text-decoration: none;
 }
+
+/* Подпись автора под нижней строкой футера: «Made with ♥ by @azimbek_s» → Telegram. */
+.footer-credit {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.4em;
+  /* снизу место под плавающую кнопку «Наверх», иначе она закрывает подпись */
+  padding-bottom: 5rem;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.45);
+}
+.footer-heart {
+  fill: #e5484d;
+  flex: none;
+}
+.footer-credit-link {
+  color: var(--amber-bright);
+  transition: color 0.3s var(--ease);
+}
+.footer-credit-link:hover {
+  color: #fff;
+}
+@media (max-width: 720px) {
+  .footer-credit {
+    justify-content: flex-start;
+  }
+}
