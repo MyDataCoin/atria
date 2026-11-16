@@ -128,7 +128,7 @@ export default function BuildingHero() {
                 <span className="dot" />
                 <span>{hero.primary}</span>
               </a>
-              <a href="#how" className="btn btn-ghost magnetic">
+              <a href={hero.secondaryHref || '#how'} className="btn btn-ghost magnetic">
                 <span>{hero.secondary}</span>
               </a>
             </motion.div>

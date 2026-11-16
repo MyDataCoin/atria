@@ -10,6 +10,7 @@ import DocPage from './components/DocPage.jsx'
 import { docPageFor } from './docs.js'
 import ObjectPage, { objectRouteFor } from './components/ObjectPage.jsx'
 
+import Backing from './sections/Backing.jsx'
 import HowItWorks from './sections/HowItWorks.jsx'
 import Portfolio from './sections/Portfolio.jsx'
 import Risks from './sections/Risks.jsx'
@@ -24,11 +25,12 @@ function Site() {
       <Nav />
       <BuildingHero />
       <main>
-        {/* Только нужное: что купить, как, чем рискуете, ответы. Объекты — сразу после экрана. */}
+        {/* Что купить → чем обеспечен токен → как купить → ответы → что важно знать. */}
         <Portfolio />
+        <Backing />
         <HowItWorks />
-        <Risks />
         <Faq />
+        <Risks />
       </main>
       <Footer />
       <ToTop />

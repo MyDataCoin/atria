@@ -4688,3 +4688,13 @@ a.details-unit {
     justify-content: flex-start;
   }
 }
+
+/* «Чем обеспечен токен»: четыре опоры сеткой 2×2. */
+.def-grid.cols-2 {
+  grid-template-columns: repeat(2, 1fr);
+}
+@media (max-width: 720px) {
+  .def-grid.cols-2 {
+    grid-template-columns: 1fr;
+  }
+}

@@ -36,11 +36,13 @@ export default function Risks() {
           ))}
         </div>
 
-        <Reveal as="div" className="risk-final">
-          <span className="sq" aria-hidden="true" />
-          <span className="big">{c.disclaimer}</span>
-        </Reveal>
-        <p className="s-note">{c.microcopy}</p>
+        {c.disclaimer && (
+          <Reveal as="div" className="risk-final">
+            <span className="sq" aria-hidden="true" />
+            <span className="big">{c.disclaimer}</span>
+          </Reveal>
+        )}
+        {c.microcopy && <p className="s-note">{c.microcopy}</p>}
       </div>
     </section>
   )
