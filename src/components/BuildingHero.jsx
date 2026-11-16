@@ -124,12 +124,8 @@ export default function BuildingHero() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.9, ease: EASE, delay: 0.9 }}
             >
-              <a href="#portfolio" className="btn btn-primary magnetic">
-                <span className="dot" />
+              <a href="#portfolio" className="btn btn-primary">
                 <span>{hero.primary}</span>
-              </a>
-              <a href={hero.secondaryHref || '#how'} className="btn btn-ghost magnetic">
-                <span>{hero.secondary}</span>
               </a>
             </motion.div>
           </motion.div>

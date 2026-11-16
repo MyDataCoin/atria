@@ -4737,3 +4737,28 @@ a.details-unit {
 .acc-q {
   justify-content: space-between;
 }
+
+.nav-logout {
+  font-size: 0.9rem;
+  color: var(--ink-3);
+  transition: color 0.2s ease;
+}
+.nav-logout:hover {
+  color: var(--ink);
+}
+
+.bhero-cta {
+  align-items: center;
+}
+.bhero-link {
+  margin-left: 0.6rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--ink);
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 2px;
+  transition: border-color 0.2s ease;
+}
+.bhero-link:hover {
+  border-color: var(--ink);
+}

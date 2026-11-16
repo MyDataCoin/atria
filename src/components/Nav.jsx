@@ -105,11 +105,6 @@ export default function Nav() {
 
   const closeMenu = () => setOpen(false)
 
-  const openRegister = () => {
-    closeMenu()
-    setAuthMode('register')
-  }
-
   const openLogin = () => {
     closeMenu()
     setAuthMode('login')
@@ -133,7 +128,7 @@ export default function Nav() {
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 1, ease: EASE, delay: 0.2 }}
       >
-        <a href={linkHref('#top')} className="nav-brand magnetic" aria-label="ATRIA" onClick={closeMenu}>
+        <a href={linkHref('#top')} className="nav-brand" aria-label="ATRIA" onClick={closeMenu}>
           <img src="/atria-logo.png" alt="ATRIA" className="nav-logo" />
         </a>
 
@@ -157,27 +152,23 @@ export default function Nav() {
           {authed ? (
             <>
               {needsOnboarding ? (
-                <button type="button" className="nav-cta magnetic" onClick={openOnboarding}>
+                <button type="button" className="nav-cta" onClick={openOnboarding}>
                   Продолжить
                 </button>
               ) : (
-                <a href={DASHBOARD_URL} className="nav-cta magnetic">
-                  Дашборд
+                <a href={DASHBOARD_URL} className="nav-cta">
+                  Кабинет
                 </a>
               )}
-              <button type="button" className="nav-cta magnetic login-btn" onClick={handleLogout}>
+              <button type="button" className="nav-logout" onClick={handleLogout}>
                 Выйти
               </button>
             </>
           ) : (
-            <>
-              <button type="button" className="nav-cta magnetic" onClick={openRegister}>
-                {nav.cta}
-              </button>
-              <button type="button" className="nav-cta magnetic login-btn" onClick={openLogin}>
-                Войти
-              </button>
-            </>
+            // Одна кнопка: окно входа по телефону само переводит на регистрацию, если номер новый.
+            <button type="button" className="nav-cta" onClick={openLogin}>
+              Войти
+            </button>
           )}
         </div>
 
@@ -230,22 +221,17 @@ export default function Nav() {
                       </button>
                     ) : (
                       <a href={DASHBOARD_URL} className="nav-cta" onClick={closeMenu}>
-                        Дашборд
+                        Кабинет
                       </a>
                     )}
-                    <button type="button" className="nav-cta login-btn" onClick={handleLogout}>
+                    <button type="button" className="nav-logout" onClick={handleLogout}>
                       Выйти
                     </button>
                   </>
                 ) : (
-                  <>
-                    <button type="button" className="nav-cta" onClick={openRegister}>
-                      {nav.cta}
-                    </button>
-                    <button type="button" className="nav-cta login-btn" onClick={openLogin}>
-                      Войти
-                    </button>
-                  </>
+                  <button type="button" className="nav-cta" onClick={openLogin}>
+                    Войти
+                  </button>
                 )}
               </div>
             </motion.div>
