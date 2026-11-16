@@ -97,6 +97,9 @@ const REFRESH_PATH = '/auth/refresh'
 // бэкенд ротирует refresh-токен, и второй такой запрос получил бы уже отозванный.
 let refreshInFlight = null
 
+// До какого момента не пытаться обновляться после 429 (сервер сказал Retry-After).
+let refreshBackoffUntil = 0
+
 /** Подписчики на потерю сессии — UI использует это, чтобы вернуть человека ко входу. */
 const sessionLostHandlers = new Set()
 
@@ -210,6 +213,9 @@ function scheduleProactiveRefresh() {
  * включая обрыв связи, — и человека выбрасывало на вход из-за одного неудачного запроса.
  */
 async function refreshSession() {
+  if (Date.now() < refreshBackoffUntil) {
+    throw new RefreshUnavailableError(new ApiError('Ждём окончания лимита', 429, null))
+  }
   refreshInFlight ??= (async () => {
     let lastError = null
     const deadline = Date.now() + REFRESH_TOTAL_BUDGET_MS
@@ -241,8 +247,20 @@ async function refreshSession() {
         attemptTimeout.done()
       }
 
-      if (res.status === 401 || res.status === 403) {
+      // 400 — сервер не получил токена вовсе (куки нет): сессии нет, это не сбой связи. Раньше 400
+      // считался временным, сайт держал мёртвый access-токен и рисовал «Дашборд», а кабинет на том же
+      // браузере честно просил войти.
+      if (res.status === 400 || res.status === 401 || res.status === 403) {
         throw new SessionExpiredError(res.status, safeJson(await res.text()))
+      }
+
+      // 429 — упёрлись в лимит. Повторять сразу значит только продлевать блокировку (так сайт и
+      // кабинет выбивали друг другу лимит). Сессию не трогаем и до Retry-After не дёргаемся.
+      if (res.status === 429) {
+        const wait = Number(res.headers.get('Retry-After'))
+        refreshBackoffUntil = Date.now() + (Number.isFinite(wait) && wait > 0 ? wait * 1000 : 30_000)
+        lastError = new ApiError('Слишком много попыток обновить сессию', 429, null)
+        break
       }
 
       if (!res.ok) {
@@ -307,6 +325,30 @@ if (typeof document !== 'undefined') {
 
   // Стартовое расписание: вкладку могли открыть с уже сохранённым токеном.
   scheduleProactiveRefresh()
+
+  // Живой access-токен ещё не значит живую сессию: куку могли стереть выходом в кабинете, сменой
+  // пароля или чисткой браузера. Без этой проверки сайт до 15 минут показывал «Дашборд», а кабинет
+  // на том же браузере — «Требуется вход», и человек ходил по кругу. Проверяем раз на вкладку и
+  // всегда — когда пришли из кабинета.
+  const VERIFIED_KEY = 'atria.sessionVerified'
+  let verified = false
+  try {
+    verified = sessionStorage.getItem(VERIFIED_KEY) === '1'
+  } catch {
+    /* приватный режим — просто проверим */
+  }
+  const fromApp = /^https:\/\/(app|admin)\.atria\.kg/.test(document.referrer || '')
+  if (tokens.access && (!verified || fromApp)) {
+    refreshSession()
+      .then(() => {
+        try {
+          sessionStorage.setItem(VERIFIED_KEY, '1')
+        } catch {
+          /* не критично */
+        }
+      })
+      .catch(() => {})
+  }
 }
 
 /**
