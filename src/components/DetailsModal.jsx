@@ -63,6 +63,12 @@ const CONSTRUCTION_STAGES = {
 
 const QUARTERS = ['I', 'II', 'III', 'IV']
 
+// Естественный порядок номеров помещений: «Г2» раньше «Г10».
+const UNIT_ORDER = new Intl.Collator('ru', { numeric: true, sensitivity: 'base' })
+
+// Виды картинок, которые показываем целиком, без обрезки.
+const PLAN_KINDS = new Set(['floor_plan', 'site_plan'])
+
 const AMENITY_LABELS = {
   hasElevator: 'лифт',
   hasHeating: 'отопление',
@@ -98,7 +104,14 @@ const pick = (obj, keys) => {
  * набор полей, а различаются они тем, что у здания нет выпуска и планировки, зато
  * есть список помещений внутри. Режим задаётся пропом `isBuilding`.
  */
-export default function DetailsModal({ property, onClose, isBuilding = false, onOpenUnit }) {
+export default function DetailsModal({
+  property,
+  onClose,
+  isBuilding = false,
+  onOpenUnit,
+  asPage = false, // отдельная страница объекта вместо модалки
+  actions = null, // кнопки под заголовком (например, «Купить» на странице помещения)
+}) {
   const isOpen = Boolean(property)
   const [imgIndex, setImgIndex] = useState(0)
   const [zoomed, setZoomed] = useState(false) // открыт ли лайтбокс с увеличенным фото
@@ -112,18 +125,19 @@ export default function DetailsModal({ property, onClose, isBuilding = false, on
 
   useEffect(() => {
     if (!isOpen) return
-    document.body.style.overflow = 'hidden'
+    // На странице прокрутку не блокируем и по Escape никуда не уходим — только закрываем лайтбокс.
+    if (!asPage) document.body.style.overflow = 'hidden'
     const onKey = (e) => {
       if (e.key !== 'Escape') return
       if (zoomed) setZoomed(false)
-      else onClose?.()
+      else if (!asPage) onClose?.()
     }
     window.addEventListener('keydown', onKey)
     return () => {
-      document.body.style.overflow = ''
+      if (!asPage) document.body.style.overflow = ''
       window.removeEventListener('keydown', onKey)
     }
-  }, [isOpen, onClose, zoomed])
+  }, [isOpen, onClose, zoomed, asPage])
 
   const data = useMemo(() => {
     if (!property) return null
@@ -209,9 +223,10 @@ export default function DetailsModal({ property, onClose, isBuilding = false, on
       rooms: (Array.isArray(property.rooms) ? property.rooms : []).filter((r) => r?.name),
       // Только для здания: помещения внутри. Черновики на витрину не пускаем — админу
       // бэкенд отдаёт их наравне с опубликованными.
-      units: (Array.isArray(property.units) ? property.units : []).filter(
-        (u) => u?.id && !isDraft(u),
-      ),
+      units: (Array.isArray(property.units) ? property.units : [])
+        .filter((u) => u?.id && !isDraft(u))
+        // По номеру, а не в порядке заведения: Г1, Г2, … Г10.
+        .sort((a, b) => UNIT_ORDER.compare(String(a.unitNumber ?? ''), String(b.unitNumber ?? ''))),
     }
   }, [property])
 
@@ -321,39 +336,16 @@ export default function DetailsModal({ property, onClose, isBuilding = false, on
   const imgCount = data.images.length
   const goImg = (dir) => setImgIndex((i) => (i + dir + imgCount) % imgCount)
 
-  return (
+  const inner = (
     <>
-    <AnimatePresence>
-      {isOpen && (
-        <motion.div
-          className="reg-overlay"
-          data-lenis-prevent
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.3, ease: EASE }}
-          onMouseDown={(e) => {
-            if (e.target === e.currentTarget) onClose?.()
-          }}
-        >
-          <motion.div
-            className="reg-card details-card"
-            data-lenis-prevent
-            initial={{ opacity: 0, y: 24, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 16, scale: 0.97 }}
-            transition={{ duration: 0.45, ease: EASE }}
-            role="dialog"
-            aria-modal="true"
-          >
-            <button className="reg-close" onClick={onClose} aria-label="Закрыть">
-              <svg viewBox="0 0 24 24" width="16" height="16">
-                <path d="M5 5L19 19M19 5L5 19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-              </svg>
-            </button>
 
             <span className="eyebrow">{isBuilding ? 'О здании' : 'Об объекте'}</span>
-            <h2 className="reg-title display details-title">{property.name}</h2>
+            {asPage ? (
+              <h1 className="reg-title display details-title">{property.name}</h1>
+            ) : (
+              <h2 className="reg-title display details-title">{property.name}</h2>
+            )}
+            {actions}
 
             {/* Галерея фото объекта: стрелки, счётчик, клик — увеличить. */}
             {imgCount > 0 && (
@@ -362,7 +354,13 @@ export default function DetailsModal({ property, onClose, isBuilding = false, on
                   <button
                     type="button"
                     className="details-gallery-main"
-                    style={{ backgroundImage: `url(${data.images[imgIndex]?.url})` }}
+                    style={{
+                      backgroundImage: `url(${data.images[imgIndex]?.url})`,
+                      // План обрезать нельзя — он нужен целиком; фото и рендер заполняют рамку.
+                      ...(PLAN_KINDS.has(data.images[imgIndex]?.kind)
+                        ? { backgroundSize: 'contain', backgroundRepeat: 'no-repeat', backgroundColor: '#fff' }
+                        : null),
+                    }}
                     onClick={() => setZoomed(true)}
                     aria-label="Увеличить фото"
                   >
@@ -461,7 +459,9 @@ export default function DetailsModal({ property, onClose, isBuilding = false, on
                     const a = Number(u.totalAreaSqM)
                     const line = [
                       UNIT_TYPES[u.unitType] || null,
-                      u.unitNumber ? `№${u.unitNumber}` : null,
+                      u.unitNumber && !String(u.name || '').includes(u.unitNumber)
+                        ? `№${u.unitNumber}`
+                        : null,
                       u.roomCount ? `${u.roomCount}-комн.` : null,
                       Number.isFinite(a) && a > 0 ? `${area(a)} м²` : null,
                       u.floorNumber != null ? `${u.floorNumber} этаж` : null,
@@ -469,16 +469,25 @@ export default function DetailsModal({ property, onClose, isBuilding = false, on
                       .filter(Boolean)
                       .join(' · ')
                     return (
-                      <button
-                        type="button"
-                        className="details-unit"
-                        key={u.id}
-                        onClick={() => onOpenUnit?.(u)}
-                      >
-                        <span className="details-unit-name">{u.name}</span>
-                        {line && <span className="details-unit-line">{line}</span>}
-                        <span className="details-unit-go" aria-hidden="true">→</span>
-                      </button>
+                      // На странице — настоящая ссылка (открыть в новой вкладке, скопировать адрес).
+                      asPage ? (
+                        <a className="details-unit" key={u.id} href={`/unit/${u.id}`}>
+                          <span className="details-unit-name">{u.name}</span>
+                          {line && <span className="details-unit-line">{line}</span>}
+                          <span className="details-unit-go" aria-hidden="true">→</span>
+                        </a>
+                      ) : (
+                        <button
+                          type="button"
+                          className="details-unit"
+                          key={u.id}
+                          onClick={() => onOpenUnit?.(u)}
+                        >
+                          <span className="details-unit-name">{u.name}</span>
+                          {line && <span className="details-unit-line">{line}</span>}
+                          <span className="details-unit-go" aria-hidden="true">→</span>
+                        </button>
+                      )
                     )
                   })}
                 </div>
@@ -551,6 +560,60 @@ export default function DetailsModal({ property, onClose, isBuilding = false, on
               </div>
             </div>
 
+    </>
+  )
+
+  const lightbox = zoomed && imgCount > 0 && (
+    <Lightbox
+      images={data.images}
+      index={imgIndex}
+      name={property.name}
+      onClose={() => setZoomed(false)}
+      onStep={goImg}
+    />
+  )
+
+  // Отдельная страница объекта: то же содержимое, без оверлея — со своим адресом.
+  if (asPage) {
+    return (
+      <>
+        <div className="details-card details-page">{inner}</div>
+        {lightbox}
+      </>
+    )
+  }
+
+  return (
+    <>
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          className="reg-overlay"
+          data-lenis-prevent
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.3, ease: EASE }}
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) onClose?.()
+          }}
+        >
+          <motion.div
+            className="reg-card details-card"
+            data-lenis-prevent
+            initial={{ opacity: 0, y: 24, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 16, scale: 0.97 }}
+            transition={{ duration: 0.45, ease: EASE }}
+            role="dialog"
+            aria-modal="true"
+          >
+            <button className="reg-close" onClick={onClose} aria-label="Закрыть">
+              <svg viewBox="0 0 24 24" width="16" height="16">
+                <path d="M5 5L19 19M19 5L5 19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+            </button>
+            {inner}
             <button className="btn btn-ghost details-close-btn" onClick={onClose}>
               <span>Закрыть</span>
             </button>
@@ -559,42 +622,46 @@ export default function DetailsModal({ property, onClose, isBuilding = false, on
       )}
     </AnimatePresence>
 
-    {/* Лайтбокс: увеличенное фото поверх модалки. Клик по фону — закрыть. */}
-    {zoomed && imgCount > 0 && (
+    {lightbox}
+    </>
+  )
+}
+
+/** Лайтбокс: увеличенное фото поверх модалки или страницы. Клик по фону — закрыть. */
+function Lightbox({ images, index, name, onClose, onStep }) {
+  return (
       <div
         className="details-lightbox"
         data-lenis-prevent
-        onClick={() => setZoomed(false)}
+        onClick={() => onClose()}
         role="dialog"
         aria-modal="true"
       >
-        <button className="details-lightbox-close" aria-label="Закрыть" onClick={() => setZoomed(false)}>
+        <button className="details-lightbox-close" aria-label="Закрыть" onClick={() => onClose()}>
           <svg viewBox="0 0 24 24" width="20" height="20">
             <path d="M5 5L19 19M19 5L5 19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
           </svg>
         </button>
-        {imgCount > 1 && (
+        {images.length > 1 && (
           <>
             <button
               className="details-nav prev lb"
               aria-label="Предыдущее фото"
-              onClick={(e) => { e.stopPropagation(); goImg(-1) }}
+              onClick={(e) => { e.stopPropagation(); onStep(-1) }}
             >
               <svg viewBox="0 0 24 24" width="26" height="26"><path d="M15 5l-7 7 7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" /></svg>
             </button>
             <button
               className="details-nav next lb"
               aria-label="Следующее фото"
-              onClick={(e) => { e.stopPropagation(); goImg(1) }}
+              onClick={(e) => { e.stopPropagation(); onStep(1) }}
             >
               <svg viewBox="0 0 24 24" width="26" height="26"><path d="M9 5l7 7-7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" /></svg>
             </button>
-            <span className="details-counter lb">{imgIndex + 1} / {imgCount}</span>
+            <span className="details-counter lb">{index + 1} / {images.length}</span>
           </>
         )}
-        <img src={data.images[imgIndex]?.url} alt={property.name} onClick={(e) => e.stopPropagation()} />
+        <img src={images[index]?.url} alt={name} onClick={(e) => e.stopPropagation()} />
       </div>
-    )}
-    </>
   )
 }

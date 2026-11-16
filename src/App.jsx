@@ -8,6 +8,7 @@ import BuildingHero from './components/BuildingHero.jsx'
 import Footer from './components/Footer.jsx'
 import DocPage from './components/DocPage.jsx'
 import { docPageFor } from './docs.js'
+import ObjectPage, { objectRouteFor } from './components/ObjectPage.jsx'
 
 import WhatIsAtria from './sections/WhatIsAtria.jsx'
 import RwaExplainer from './sections/RwaExplainer.jsx'
@@ -79,9 +80,25 @@ function Doc({ page }) {
   )
 }
 
+// Страница здания или помещения (/building/<id>, /unit/<id>) — своя ссылка на каждый объект.
+function ObjectRoute({ route }) {
+  useSmoothScroll()
+  return (
+    <>
+      <Cursor />
+      <Nav />
+      <ObjectPage route={route} />
+      <Footer />
+      <ToTop />
+    </>
+  )
+}
+
 function Page() {
   const path = window.location.pathname.replace(/\/+$/, '').toLowerCase()
   if (path === '/contacts') return <Contacts />
+  const objectRoute = objectRouteFor(window.location.pathname)
+  if (objectRoute) return <ObjectRoute route={objectRoute} />
   const page = docPageFor(path)
   return page ? <Doc page={page} /> : <Site />
 }

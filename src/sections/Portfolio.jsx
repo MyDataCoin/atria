@@ -6,7 +6,7 @@ import Reveal from '../components/Reveal.jsx'
 import { useContent } from '../i18n.jsx'
 import { isDraft, listBuildings, listProperties } from '../lib/properties.js'
 import PurchaseModal from '../components/PurchaseModal.jsx'
-import DetailsModal from '../components/DetailsModal.jsx'
+import { buildingHref, unitHref } from '../components/ObjectPage.jsx'
 
 // Запасные градиенты для карточек без фото (бэкенд пока не отдаёт изображения).
 const GRADIENTS = [
@@ -123,7 +123,7 @@ function fromApi(dto, i, ui, filters) {
   }
 }
 
-function PCard({ p, i, ui, onBuy, onDetails }) {
+function PCard({ p, i, ui, onBuy }) {
   const [open, setOpen] = useState(false)
   const hasDetails = p.details && p.details.length > 0
   // «Скоро» ещё нельзя купить — показываем только описание и «Подробнее»,
@@ -141,7 +141,9 @@ function PCard({ p, i, ui, onBuy, onDetails }) {
       </div>
       <div className="pcard-body">
         {!isSoon && p.loc && <span className="loc">{p.loc}</span>}
-        <h3>{p.name}</h3>
+        <h3>
+          {p.raw ? <a href={unitHref(p.id)} className="pcard-link">{p.name}</a> : p.name}
+        </h3>
         {p.unitLine && <span className="punit">{p.unitLine}</span>}
         {p.type && <span className="ptype">{p.type}</span>}
 
@@ -226,9 +228,10 @@ function PCard({ p, i, ui, onBuy, onDetails }) {
 
         {p.raw && (
           <div className="pcard-actions">
-            <button className="btn btn-ghost" onClick={() => onDetails(p.raw)}>
+            {/* Своя страница у каждого помещения — ссылку можно переслать. */}
+            <a className="btn btn-ghost" href={unitHref(p.id)}>
               <span>{ui.more || 'Подробнее'}</span>
-            </button>
+            </a>
             {canBuy && (
               <button
                 className="btn btn-primary"
@@ -264,7 +267,7 @@ function unitsPlural(n) {
  * сетка карточек квартир и гаражей. Каждое помещение продаётся отдельно, здание само
  * ничего не выпускает, поэтому у шапки нет ни цены, ни прогресса.
  */
-function BuildingGroup({ group, ui, onBuy, onDetails, onBuildingDetails }) {
+function BuildingGroup({ group, ui, onBuy }) {
   const { building, cards } = group
   const meta = [
     building.city,
@@ -298,18 +301,16 @@ function BuildingGroup({ group, ui, onBuy, onDetails, onBuildingDetails }) {
             Здание
             {cover && coverIsRender && <span className="pgroup-render">Фото — визуализация</span>}
           </span>
-          <h3 className="pgroup-name">{building.name}</h3>
+          <h3 className="pgroup-name">
+            <a href={buildingHref(building.id)} className="pgroup-link">{building.name}</a>
+          </h3>
           {meta && <span className="pgroup-meta">{meta}</span>}
         </div>
         <div className="pgroup-side">
           <span className="pgroup-count">{unitsPlural(cards.length)}</span>
-          <button
-            type="button"
-            className="pgroup-more"
-            onClick={() => onBuildingDetails(building)}
-          >
+          <a className="pgroup-more" href={buildingHref(building.id)}>
             О здании
-          </button>
+          </a>
         </div>
       </div>
 
@@ -319,7 +320,7 @@ function BuildingGroup({ group, ui, onBuy, onDetails, onBuildingDetails }) {
           квартирами карточки заполняют ряд целиком, а не жмутся в две трети с дыркой справа. */}
       <div className="pgrid pgroup-grid" data-cols={Math.min(cards.length, 3)}>
         {cards.map((p, i) => (
-          <PCard key={p.id} p={p} i={i} ui={ui} onBuy={onBuy} onDetails={onDetails} />
+          <PCard key={p.id} p={p} i={i} ui={ui} onBuy={onBuy} />
         ))}
       </div>
     </Reveal>
@@ -334,8 +335,6 @@ export default function Portfolio() {
   // groups — здания с их помещениями, loose — самостоятельные выпуски вне здания.
   const [state, setState] = useState({ status: 'loading', groups: [], loose: [] })
   const [buying, setBuying] = useState(null) // выбранный объект для покупки
-  const [details, setDetails] = useState(null) // выбранное помещение для «Подробнее»
-  const [buildingDetails, setBuildingDetails] = useState(null) // выбранное здание для «О здании»
 
   useEffect(() => {
     let alive = true
@@ -437,8 +436,6 @@ export default function Portfolio() {
               group={group}
               ui={ui}
               onBuy={setBuying}
-              onDetails={setDetails}
-              onBuildingDetails={setBuildingDetails}
             />
           ))}
         </div>
@@ -448,24 +445,13 @@ export default function Portfolio() {
           <motion.div className="pgrid" layout>
             <AnimatePresence>
               {loose.map((p, i) => (
-                <PCard key={p.id} p={p} i={i} ui={ui} onBuy={setBuying} onDetails={setDetails} />
+                <PCard key={p.id} p={p} i={i} ui={ui} onBuy={setBuying} />
               ))}
             </AnimatePresence>
           </motion.div>
         )}
 
         <PurchaseModal property={buying} onClose={() => setBuying(null)} />
-        <DetailsModal property={details} onClose={() => setDetails(null)} />
-        <DetailsModal
-          isBuilding
-          property={buildingDetails}
-          onClose={() => setBuildingDetails(null)}
-          // Клик по помещению в списке здания — переключаемся на его карточку.
-          onOpenUnit={(unit) => {
-            setBuildingDetails(null)
-            setDetails(unit)
-          }}
-        />
 
         <Reveal as="div" className="port-strip">
           <p>
