@@ -101,6 +101,7 @@ function fromApi(dto, i, ui, filters) {
     status: statusLabel(filters, statusKey),
     salesPaused: dto.salesPaused === true, // продажи временно приостановлены (кнопка «Купить» блокируется)
     img: dto.images?.[0]?.url || undefined, // первая фотка — обложка карточки (иначе градиент)
+    imgIsRender: dto.images?.[0]?.kind === 'render', // рендер на обложке подписываем «Визуализация»
     unitLine: unitLine(dto), // «Квартира №12 · 3-комн. · 128,82 м²» — пусто у самостоятельных выпусков
     details: [],
     raw: dto, // полный объект для модалки покупки
@@ -121,6 +122,7 @@ function PCard({ p, i, ui, onBuy, onDetails }) {
         style={p.img ? { backgroundImage: `url(${p.img})` } : { background: p.bg }}
       >
         <span className={`pcard-badge ${p.statusKey}`}>{p.status}</span>
+        {p.img && p.imgIsRender && <span className="img-render-tag">Визуализация</span>}
       </div>
       <div className="pcard-body">
         {!isSoon && p.loc && <span className="loc">{p.loc}</span>}
@@ -260,15 +262,27 @@ function BuildingGroup({ group, ui, onBuy, onDetails, onBuildingDetails }) {
     .join(' · ')
 
   const cover = building.images?.[0]?.url
+  // Строящееся здание сфотографировать нельзя — на обложке рендер, и он обязан быть подписан,
+  // иначе картинка читается как фото готового здания.
+  const coverIsRender = building.images?.[0]?.kind === 'render'
 
   return (
     <Reveal as="div" className="pgroup" y={24} amount={0.1}>
       <div className="pgroup-head">
         {cover && (
-          <div className="pgroup-cover" style={{ backgroundImage: `url(${cover})` }} aria-hidden="true" />
+          <div
+            className="pgroup-cover"
+            style={{ backgroundImage: `url(${cover})` }}
+            role="img"
+            aria-label={coverIsRender ? `${building.name} — визуализация` : building.name}
+            title={coverIsRender ? 'Визуализация, не фотография' : undefined}
+          />
         )}
         <div className="pgroup-info">
-          <span className="pgroup-eyebrow">Здание</span>
+          <span className="pgroup-eyebrow">
+            Здание
+            {cover && coverIsRender && <span className="pgroup-render">Фото — визуализация</span>}
+          </span>
           <h3 className="pgroup-name">{building.name}</h3>
           {meta && <span className="pgroup-meta">{meta}</span>}
         </div>

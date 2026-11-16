@@ -401,6 +401,10 @@ export default function DetailsModal({ property, onClose, isBuilding = false, on
                     </>
                   )}
                 </div>
+                {/* Подпись загрузившего («не фотография, логотипы условные») — под картинкой. */}
+                {data.images[imgIndex]?.caption && (
+                  <p className="details-caption">{data.images[imgIndex].caption}</p>
+                )}
                 {imgCount > 1 && (
                   <div className="details-thumbs">
                     {data.images.map((img, i) => (

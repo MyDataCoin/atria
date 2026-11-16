@@ -2426,6 +2426,32 @@ body::after {
   letter-spacing: 0.1em;
   color: var(--amber-deep, var(--amber));
 }
+/* Обложка здания — рендер: пометка рядом с «Здание», потому что миниатюра слишком мала для текста. */
+.pgroup-render {
+  display: inline-block;
+  margin-left: 0.6em;
+  padding: 0.15em 0.55em;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  color: var(--ink);
+  opacity: 0.7;
+  letter-spacing: 0.04em;
+}
+/* Рендер на обложке карточки — снизу слева, чтобы не спорить со статусом сверху. */
+.img-render-tag {
+  position: absolute;
+  bottom: 0.9rem;
+  left: 0.9rem;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.35em 0.65em;
+  border-radius: 100px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(6px);
+}
 .pgroup-name {
   font-family: var(--font-display);
   font-size: clamp(1.35rem, 2.4vw, 1.75rem);
@@ -4142,6 +4168,13 @@ body::after {
   border-radius: 50%;
   color: #fff;
   background: color-mix(in srgb, #fff 15%, transparent);
+}
+.details-caption {
+  margin: 0.5rem 0 0;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--ink);
+  opacity: 0.65;
 }
 .details-thumbs {
   display: flex;
