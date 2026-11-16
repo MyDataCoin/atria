@@ -309,7 +309,7 @@ function BuildingGroup({ group, ui, onBuy }) {
         <div className="pgroup-side">
           <span className="pgroup-count">{unitsPlural(cards.length)}</span>
           <a className="pgroup-more" href={buildingHref(building.id)}>
-            О здании
+            Подробнее
           </a>
         </div>
       </div>

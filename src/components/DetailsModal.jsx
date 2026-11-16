@@ -339,7 +339,8 @@ export default function DetailsModal({
   const inner = (
     <>
 
-            <span className="eyebrow">{isBuilding ? 'О здании' : 'Об объекте'}</span>
+            {/* Без предлога «О»: в моноширинном капсе он читается как ноль («0 ЗДАНИИ»). */}
+            <span className="eyebrow">{isBuilding ? 'Здание' : data.unitType || 'Объект'}</span>
             {asPage ? (
               <h1 className="reg-title display details-title">{property.name}</h1>
             ) : (
