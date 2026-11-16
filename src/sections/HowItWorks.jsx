@@ -9,15 +9,15 @@ export default function HowItWorks() {
       <div className="container">
         <SHead eyebrow={c.eyebrow} headline={c.headline} sub={c.subhead} />
 
-        <div className="steps2">
+        <div className="steps-row">
           {c.steps.map((s, i) => (
-            <Reveal as="div" className={`step2 ${i === 3 ? 'on' : ''}`} key={s.n} delay={i * 0.08} y={22}>
-              <span className="num">{s.n}</span>
-              <div>
-                <span className="val">{s.value}</span>
-                <h3>{s.label}</h3>
-                <p>{s.text}</p>
+            <Reveal as="div" className="step-col" key={s.n} delay={i * 0.06} y={16}>
+              <div className="step-top">
+                <b>{i + 1}</b>
+                <span>{s.value}</span>
               </div>
+              <h3>{s.label}</h3>
+              <p>{s.text}</p>
             </Reveal>
           ))}
         </div>

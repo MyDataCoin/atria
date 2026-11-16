@@ -1,7 +1,6 @@
 import { useEffect } from 'react'
 import { LangProvider } from './i18n.jsx'
 import { useSmoothScroll } from './lib/smooth.js'
-import Cursor from './components/Cursor.jsx'
 import Nav from './components/Nav.jsx'
 import ToTop from './components/ToTop.jsx'
 import BuildingHero from './components/BuildingHero.jsx'
@@ -21,7 +20,6 @@ function Site() {
   useSmoothScroll()
   return (
     <>
-      <Cursor />
       <Nav />
       <BuildingHero />
       <main>
@@ -46,7 +44,6 @@ function Contacts() {
   }, [])
   return (
     <>
-      <Cursor />
       <Nav />
       <main>
         <Contact />
@@ -63,7 +60,6 @@ function Doc({ page }) {
   useSmoothScroll()
   return (
     <>
-      <Cursor />
       <DocPage page={page} />
       <Footer />
       <ToTop />
@@ -76,7 +72,6 @@ function ObjectRoute({ route }) {
   useSmoothScroll()
   return (
     <>
-      <Cursor />
       <Nav />
       <ObjectPage route={route} />
       <Footer />

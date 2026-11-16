@@ -4,9 +4,9 @@
    ============================================================ */
 
 :root {
-  --bone: #f3efe7;
-  --paper: #faf8f3;
-  --paper-2: #fffefb;
+  --bone: #f2f2f0;
+  --paper: #ffffff;
+  --paper-2: #ffffff;
   --ink: #141518;
   --ink-2: #4a4d52;
   --ink-3: #82858b;
@@ -16,7 +16,7 @@
   --amber-soft: #f0d9b4;
   --amber-deep: #a96a26;
   --amber-glow: rgba(230, 169, 81, 0.5);
-  --cream: #f5f1e8;
+  --cream: #f2f2f0;
   --sage: #6f7d6f;
 
   --line: rgba(20, 21, 24, 0.12);
@@ -24,7 +24,7 @@
 
   --font-display: 'Fraunces', Georgia, serif;
   --font-sans: 'Hanken Grotesk', system-ui, -apple-system, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --font-mono: 'Hanken Grotesk', system-ui, -apple-system, sans-serif;
 
   --maxw: 1340px;
   --gutter: clamp(1.25rem, 5vw, 5.5rem);
@@ -61,12 +61,6 @@ body {
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   overflow-x: hidden;
-  cursor: none;
-}
-@media (pointer: coarse) {
-  body {
-    cursor: auto;
-  }
 }
 
 img {
@@ -79,7 +73,7 @@ a {
 }
 button {
   font-family: inherit;
-  cursor: none;
+  cursor: pointer;
   border: none;
   background: none;
   color: inherit;
@@ -89,17 +83,6 @@ button {
   color: var(--paper);
 }
 
-/* faint paper grain */
-body::after {
-  content: '';
-  position: fixed;
-  inset: 0;
-  z-index: 9000;
-  pointer-events: none;
-  opacity: 0.035;
-  mix-blend-mode: multiply;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-}
 
 /* ----------------------------------------------------------
    Type helpers
@@ -118,22 +101,18 @@ body::after {
   letter-spacing: 0.04em;
 }
 .eyebrow {
-  font-family: var(--font-mono);
-  font-weight: 500;
-  font-size: clamp(0.68rem, 0.9vw, 0.76rem);
-  letter-spacing: 0.06em;
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--amber);
+  color: var(--ink-3);
   display: inline-flex;
   align-items: center;
   gap: 0.7rem;
 }
 .eyebrow::before {
-  content: '';
-  width: 1.6rem;
-  height: 1px;
-  background: currentColor;
-  opacity: 0.55;
+  display: none;
 }
 .eyebrow.center::before {
   display: none;
@@ -171,7 +150,7 @@ body::after {
   font-weight: 500;
   letter-spacing: 0.01em;
   padding: 1em 1.8em;
-  border-radius: 100px;
+  border-radius: 10px;
   overflow: hidden;
   isolation: isolate;
   transition: transform 0.6s var(--ease), color 0.4s var(--ease);
@@ -192,54 +171,32 @@ body::after {
   background: var(--ink);
   color: var(--paper);
 }
-.btn-primary::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  background: linear-gradient(120deg, var(--amber), var(--amber-bright));
-  transform: translateY(101%);
-  transition: transform 0.6s var(--ease);
+.btn-primary {
+  transition: background 0.25s ease;
 }
 .btn-primary:hover {
-  color: var(--ink);
+  background: #2b2d31;
 }
-.btn-primary:hover::before {
-  transform: translateY(0);
-}
-.btn-primary:hover .dot {
-  transform: scale(1.7);
+.btn .dot {
+  display: none;
 }
 .btn-ghost {
   color: var(--ink);
   border: 1px solid var(--line);
 }
-.btn-ghost::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  background: var(--ink);
-  transform: scaleX(0);
-  transform-origin: left;
-  transition: transform 0.6s var(--ease);
+.btn-ghost {
+  transition: border-color 0.25s ease, background 0.25s ease;
 }
 .btn-ghost:hover {
-  color: var(--paper);
-}
-.btn-ghost:hover::before {
-  transform: scaleX(1);
+  border-color: var(--ink);
 }
 .on-dark .btn-ghost,
 .surface-ink .btn-ghost {
   color: var(--paper);
   border-color: rgba(255, 255, 255, 0.28);
 }
-.surface-ink .btn-ghost::before {
-  background: var(--paper);
-}
 .surface-ink .btn-ghost:hover {
-  color: var(--ink);
+  border-color: var(--paper);
 }
 
 .tlink {
@@ -261,37 +218,6 @@ body::after {
 .tlink:hover::after {
   transform: scaleX(1);
   transform-origin: left;
-}
-
-/* ----------------------------------------------------------
-   Custom cursor
-   ---------------------------------------------------------- */
-.cursor-dot,
-.cursor-ring {
-  position: fixed;
-  top: 0;
-  left: 0;
-  border-radius: 50%;
-  pointer-events: none;
-  z-index: 9999;
-}
-.cursor-dot {
-  width: 8px;
-  height: 8px;
-  background: var(--amber);
-  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.9), 0 0 0 2.5px rgba(20, 21, 24, 0.18);
-}
-.cursor-ring {
-  width: 38px;
-  height: 38px;
-  border: 1.5px solid var(--amber);
-  opacity: 0.7;
-}
-@media (pointer: coarse) {
-  .cursor-dot,
-  .cursor-ring {
-    display: none;
-  }
 }
 
 /* ----------------------------------------------------------
@@ -372,7 +298,7 @@ body::after {
   font-family: var(--font-sans);
   font-size: 0.9rem;
   padding: 0.7em 1.4em;
-  border-radius: 100px;
+  border-radius: 10px;
   background: var(--ink);
   color: var(--paper);
   font-weight: 500;
@@ -550,8 +476,8 @@ body::after {
   letter-spacing: -0.025em;
 }
 .bhero-headline h1 .it {
-  font-style: italic;
-  color: var(--amber);
+  font-style: normal;
+  color: inherit;
 }
 .bhero-line {
   display: block;
@@ -607,9 +533,8 @@ body::after {
 
 /* secondary hero button needs a backdrop to read over the 3D scene */
 .bhero .btn-ghost {
-  background: color-mix(in srgb, var(--paper) 62%, transparent);
-  backdrop-filter: blur(8px) saturate(1.2);
-  border-color: color-mix(in srgb, var(--ink) 30%, transparent);
+  background: var(--paper);
+  border-color: var(--line);
 }
 
 /* scroll cue */
@@ -1603,11 +1528,8 @@ body::after {
    SHARED SECTION PRIMITIVES (educational sections)
    ============================================================ */
 .ac {
-  font-style: italic;
-  color: var(--amber);
-}
-.surface-ink .ac {
-  color: var(--amber-bright);
+  font-style: normal;
+  color: inherit;
 }
 .s-head {
   max-width: 60rem;
@@ -1636,9 +1558,8 @@ body::after {
   color: rgba(255, 255, 255, 0.72);
 }
 .s-note {
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  line-height: 1.8;
+  font-size: 0.85rem;
+  line-height: 1.6;
   color: var(--ink-3);
   max-width: 76ch;
   margin-top: clamp(2.4rem, 4vw, 3.6rem);
@@ -2902,6 +2823,7 @@ body::after {
   }
 }
 .risk-row .rl .ri {
+  display: none !important;
   font-family: var(--font-mono);
   font-size: 0.7rem;
   color: var(--ink-3);
@@ -3105,21 +3027,24 @@ body::after {
   z-index: 700;
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.72em 1.1em;
-  border-radius: 100px;
-  background: var(--ink);
-  color: var(--cream);
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  box-shadow: 0 18px 40px -18px rgba(20, 21, 24, 0.55);
-  transition: transform 0.4s var(--ease), background 0.4s var(--ease);
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  transition: border-color 0.25s ease;
+}
+.totop span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
 }
 .totop:hover {
-  transform: translateY(-3px);
-  background: var(--amber-deep);
+  border-color: var(--ink);
 }
 .totop svg {
   width: 14px;
@@ -3146,13 +3071,6 @@ body::after {
   *::after {
     animation-duration: 0.001ms !important;
     transition-duration: 0.001ms !important;
-  }
-  body {
-    cursor: auto;
-  }
-  .cursor-dot,
-  .cursor-ring {
-    display: none;
   }
 }
 
@@ -4697,4 +4615,125 @@ a.details-unit {
   .def-grid.cols-2 {
     grid-template-columns: 1fr;
   }
+}
+
+/* ============================================================
+   Backing / How / FAQ — clean editorial layout
+   ============================================================ */
+.backing-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: clamp(1.6rem, 3vw, 3rem);
+}
+.backing-item {
+  border-top: 1px solid rgba(255, 255, 255, 0.22);
+  padding-top: 1.4rem;
+}
+.backing-item h3 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(1.25rem, 1.7vw, 1.5rem);
+  line-height: 1.2;
+  margin-bottom: 0.8rem;
+}
+.backing-item p {
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.66);
+}
+.surface-ink .eyebrow {
+  color: rgba(255, 255, 255, 0.5);
+}
+.surface-ink .s-note {
+  color: rgba(255, 255, 255, 0.5);
+}
+@media (max-width: 1024px) {
+  .backing-grid {
+    grid-template-columns: repeat(2, 1fr);
+    row-gap: 2.4rem;
+  }
+}
+@media (max-width: 600px) {
+  .backing-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.steps-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: clamp(1.6rem, 3vw, 3rem);
+}
+.step-col {
+  border-top: 1px solid var(--ink);
+  padding-top: 1.2rem;
+}
+.step-col .step-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  margin-bottom: 2.2rem;
+  font-size: 0.8rem;
+  color: var(--ink-3);
+}
+.step-col .step-top b {
+  font-weight: 600;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.step-col h3 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(1.25rem, 1.7vw, 1.5rem);
+  line-height: 1.2;
+  margin-bottom: 0.7rem;
+}
+.step-col p {
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: var(--ink-2);
+}
+@media (max-width: 1024px) {
+  .steps-row {
+    grid-template-columns: repeat(2, 1fr);
+    row-gap: 2.6rem;
+  }
+}
+@media (max-width: 600px) {
+  .steps-row {
+    grid-template-columns: 1fr;
+  }
+  .step-col .step-top {
+    margin-bottom: 1rem;
+  }
+}
+
+.faq-contact {
+  display: inline-block;
+  margin-top: 1.6rem;
+  font-size: 0.95rem;
+  color: var(--ink);
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 2px;
+  transition: border-color 0.25s ease;
+}
+.faq-contact:hover {
+  border-color: var(--ink);
+}
+.acc-q .term {
+  font-family: var(--font-sans);
+  font-weight: 500;
+  font-size: clamp(1.02rem, 1.4vw, 1.15rem);
+  letter-spacing: -0.005em;
+}
+.acc-q .pm::before,
+.acc-q .pm::after {
+  background: var(--ink);
+}
+.acc-a-in {
+  font-weight: 400;
+}
+.acc-q {
+  justify-content: space-between;
 }

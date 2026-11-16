@@ -74,7 +74,7 @@ export const ru = {
   },
 
   backing: {
-    surface: 'bone',
+    surface: 'ink',
     id: 'backing',
     eyebrow: 'ОБЕСПЕЧЕНИЕ',
     headline: 'За каждым токеном — *реальное помещение*',
@@ -182,7 +182,7 @@ export const ru = {
   },
 
   risks: {
-    surface: 'paper',
+    surface: 'bone',
     id: 'risks',
     eyebrow: 'ВАЖНО ЗНАТЬ',
     headline: 'Перед покупкой',
@@ -213,12 +213,12 @@ export const ru = {
   },
 
   faq: {
-    surface: 'bone',
+    surface: 'paper',
     id: 'faq',
     eyebrow: 'ВОПРОСЫ',
     headline: 'Частые *вопросы*',
     subhead: '',
-    contact: 'Не нашли ответ? → Написать нам',
+    contact: 'Не нашли ответ? Напишите нам',
     tabs: [],
     items: [
       {

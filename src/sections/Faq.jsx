@@ -19,17 +19,7 @@ export default function Faq() {
             <Accent text={c.headline} />
           </h2>
           {c.subhead && <p className="s-sub">{c.subhead}</p>}
-          <a
-            href="/contacts"
-            className="tlink"
-            style={{
-              fontFamily: 'var(--font-mono)',
-              fontSize: '0.74rem',
-              color: 'var(--amber-deep, var(--amber))',
-              display: 'inline-block',
-              marginTop: '1.6rem',
-            }}
-          >
+          <a href="/contacts" className="faq-contact">
             {c.contact}
           </a>
         </div>
@@ -58,10 +48,7 @@ export default function Faq() {
               return (
                 <div className={`acc-item ${isOpen ? 'open' : ''}`} key={it.q}>
                   <button className="acc-q" onClick={() => setOpen(isOpen ? -1 : i)} aria-expanded={isOpen}>
-                    <span className="gloss" style={{ marginLeft: 0, color: 'var(--amber-deep, var(--amber))', minWidth: '2.5rem' }}>
-                      {String(i + 1).padStart(2, '0')}
-                    </span>
-                    <span className="term" style={{ fontSize: 'clamp(1.1rem,1.8vw,1.35rem)', flex: 1 }}>
+                    <span className="term">
                       {it.q}
                     </span>
                     <span className="pm" aria-hidden="true" />

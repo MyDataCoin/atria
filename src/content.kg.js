@@ -71,7 +71,7 @@ const t = {
     }
   },
   "backing": {
-    "surface": "bone",
+    "surface": "ink",
     "id": "backing",
     "eyebrow": "КАМСЫЗДОО",
     "headline": "Ар бир токендин артында — *чыныгы жай*",
@@ -188,7 +188,7 @@ const t = {
     "microcopy": "Долбоор пилоттук стадияда. Киреше кепилденбейт, салынган каражатты жоготуп алуу мүмкүн."
   },
   "risks": {
-    "surface": "paper",
+    "surface": "bone",
     "id": "risks",
     "eyebrow": "БИЛИП КОЮҢУЗ",
     "headline": "Сатып алуудан мурун",
@@ -218,12 +218,12 @@ const t = {
     "microcopy": "Ижара кирешеси жана нарктын өсүшү кепилденбейт."
   },
   "faq": {
-    "surface": "bone",
+    "surface": "paper",
     "id": "faq",
     "eyebrow": "СУРООЛОР",
     "headline": "Көп берилүүчү *суроолор*",
     "subhead": "",
-    "contact": "Жооп таппадыңызбы? → Бизге жазыңыз",
+    "contact": "Жооп таппадыңызбы? Бизге жазыңыз",
     "tabs": [],
     "items": [
       {
