@@ -4762,3 +4762,128 @@ a.details-unit {
 .bhero-link:hover {
   border-color: var(--ink);
 }
+
+/* ============================================================
+   Payment step (after an application is created)
+   ============================================================ */
+.pay .reg-sub {
+  margin-bottom: 1.4rem;
+}
+.pay-methods {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.6rem;
+}
+.pay-method {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper);
+  text-align: left;
+  transition: border-color 0.2s ease;
+}
+.pay-method b {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+.pay-method span {
+  font-size: 0.78rem;
+  color: var(--ink-3);
+}
+.pay-method:hover {
+  border-color: var(--ink-3);
+}
+.pay-method.on {
+  border-color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--ink);
+}
+.pay-method:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+.pay-box {
+  margin-top: 1.2rem;
+  padding: 1.1rem 1.2rem;
+  border-radius: 10px;
+  background: var(--bone);
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+.pay-paid {
+  background: #eef6ef;
+}
+.pay-row + .pay-row {
+  margin-top: 0.9rem;
+}
+.pay-k {
+  display: block;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: 0.25rem;
+}
+.pay-v {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+.pay-amount {
+  font-size: 1.35rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.pay-addr code {
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  font-size: 0.8rem;
+  word-break: break-all;
+}
+.pay-copy {
+  flex-shrink: 0;
+  font-size: 0.78rem;
+  font-weight: 500;
+  padding: 0.4em 0.8em;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+}
+.pay-copy:hover {
+  border-color: var(--ink);
+}
+.pay-qr {
+  display: block;
+  margin: 1.1rem auto 0.2rem;
+  border-radius: 8px;
+  background: #fff;
+  padding: 6px;
+}
+.pay-notes {
+  margin: 1rem 0 0;
+  padding-left: 1.1rem;
+  font-size: 0.84rem;
+  color: var(--ink-2);
+}
+.pay-notes li + li {
+  margin-top: 0.35rem;
+}
+.pay-wait {
+  margin-top: 0.9rem;
+  font-size: 0.82rem;
+  color: var(--ink-3);
+}
+.pay .buy-actions {
+  margin-top: 1.4rem;
+}
+@media (max-width: 480px) {
+  .pay-methods {
+    grid-template-columns: 1fr 1fr;
+  }
+  .pay-amount {
+    font-size: 1.15rem;
+  }
+}

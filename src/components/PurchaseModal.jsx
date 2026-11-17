@@ -3,8 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { createApplication } from '../lib/applications.js'
 import { getKycStatus, isKycApproved } from '../lib/kyc.js'
 import { ApiError, tokens } from '../lib/api.js'
-import { DASHBOARD_URL } from '../lib/dashboard.js'
 import Registration from './Registration.jsx'
+import PaymentStep from './PaymentStep.jsx'
 
 const EASE = [0.16, 1, 0.3, 1]
 // Иллюстративная годовая доходность для оценки прироста дохода (как в калькуляторе).
@@ -96,6 +96,7 @@ export default function PurchaseModal({ property, onClose, onSuccess }) {
   const [status, setStatus] = useState('idle') // idle | loading | done | error
   const [error, setError] = useState('')
   const [showKyc, setShowKyc] = useState(false) // открыта ли модалка верификации
+  const [applicationId, setApplicationId] = useState(null)
 
   // Сброс при каждом открытии нового объекта.
   useEffect(() => {
@@ -105,6 +106,7 @@ export default function PurchaseModal({ property, onClose, onSuccess }) {
       setStatus('idle')
       setError('')
       setShowKyc(false)
+      setApplicationId(null)
     }
   }, [isOpen, maxQty])
 
@@ -182,6 +184,7 @@ export default function PurchaseModal({ property, onClose, onSuccess }) {
         return
       }
       const app = await createApplication(property.id, calc.investment)
+      setApplicationId(typeof app === 'string' ? app : app?.id ?? null)
       setStatus('done')
       onSuccess?.(app)
     } catch (err) {
@@ -234,34 +237,12 @@ export default function PurchaseModal({ property, onClose, onSuccess }) {
             </button>
 
             {status === 'done' ? (
-              <div className="reg-success">
-                <div className="reg-success-icon">
-                  <svg viewBox="0 0 24 24" width="28" height="28">
-                    <path
-                      d="M4 12.5L9.5 18L20 6"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      fill="none"
-                    />
-                  </svg>
-                </div>
-                <h2 className="reg-title display">Заявка принята</h2>
-                <p className="reg-sub">
-                  Заявка на {fmtQty(calc.effectiveQty)} токенов «{property.name}» принята и встала в очередь
-                  на выпуск долей. Статус заявки виден в личном кабинете.
-                </p>
-                {/* Отслеживание живёт в дашборде, а не здесь: у главного сайта нет и не должно быть
-                    экрана «мои заявки», иначе он начинает дублировать кабинет и расходиться с ним. */}
-                <a className="btn btn-primary reg-submit" href={DASHBOARD_URL}>
-                  <span>Войти в дашборд</span>
-                  <span className="dot" />
-                </a>
-                <button className="btn btn-ghost buy-done-close" onClick={onClose}>
-                  <span>Закрыть</span>
-                </button>
-              </div>
+              <PaymentStep
+                investmentId={applicationId}
+                amountKgs={calc.investment}
+                currency={currency}
+                onClose={onClose}
+              />
             ) : (
               <>
                 <span className="eyebrow">Приобретение реального актива (RWA)</span>
@@ -366,8 +347,8 @@ export default function PurchaseModal({ property, onClose, onSuccess }) {
                   <div>
                     <strong>Соответствие регуляторным стандартам</strong>
                     <p>
-                      Долевое владение обеспечено записями первичной ипотеки и оформляется по
-                      законодательству Кыргызской Республики.
+                      Доля привязана к конкретному помещению. Права на него регистрируются в Кадастре
+                      до открытия продаж, по законодательству Кыргызской Республики.
                     </p>
                   </div>
                 </div>
