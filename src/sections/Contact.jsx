@@ -6,6 +6,10 @@ import DocModal from '../components/DocModal.jsx'
 import { CONSENT_FORM } from '../content.consent.js'
 import { useContent, useLang } from '../i18n.jsx'
 import { submitFeedback, feedbackErrorText } from '../lib/feedback.js'
+import PhoneField, { phoneIsComplete, phoneToString } from '../components/PhoneField.jsx'
+import { DEFAULT_COUNTRY } from '../lib/countries.js'
+
+const EMPTY_PHONE = { iso: DEFAULT_COUNTRY, national: '' }
 
 const EASE = [0.16, 1, 0.3, 1]
 
@@ -17,16 +21,6 @@ function emailLooksUsable(value) {
   return at > 0 && at < v.length - 1 && v.indexOf('.', at) > at + 1 && !v.includes(' ')
 }
 
-// Телефон вводится как в форме регистрации: +996 в поле уже стоит, человек набирает
-// девять своих цифр. Маска не даёт ни стереть код страны, ни набрать десятую цифру.
-function formatPhone(raw) {
-  const digits = raw.replace(/\D/g, '').replace(/^996/, '').slice(0, 9)
-  const parts = [digits.slice(0, 3), digits.slice(3, 6), digits.slice(6, 9)].filter(Boolean)
-  return parts.length ? `+996 ${parts.join(' ')}` : '+996 '
-}
-
-const phoneDigits = (formatted) => formatted.replace(/\D/g, '').replace(/^996/, '')
-
 /**
  * Форма обратной связи: имя, способ связи и вопрос. Отправляется анонимно (POST /feedback),
  * согласие на обработку данных — обязательная галочка, текст открывается тут же.
@@ -35,7 +29,7 @@ export default function Contact() {
   const c = useContent().contact
   const { lang } = useLang()
 
-  const [form, setForm] = useState({ fullName: '', email: '', phone: '+996 ', message: '' })
+  const [form, setForm] = useState({ fullName: '', email: '', phone: EMPTY_PHONE, message: '' })
   // Поля, которые человек уже трогал: подсказку об ошибке показываем только по ним, а не
   // подсвечиваем красным форму, к которой ещё не притрагивались.
   const [touched, setTouched] = useState({})
@@ -47,7 +41,7 @@ export default function Contact() {
 
   const set = (key) => (e) => {
     setError('')
-    const value = key === 'phone' ? formatPhone(e.target.value) : e.target.value
+    const value = key === 'phone' ? e : e.target.value
     setForm((f) => ({ ...f, [key]: value }))
   }
 
@@ -58,7 +52,7 @@ export default function Contact() {
   const problems = {
     fullName: form.fullName.trim().length > 1 ? '' : c.errors.name,
     email: emailLooksUsable(form.email) ? '' : c.errors.email,
-    phone: phoneDigits(form.phone).length === 9 ? '' : c.errors.phone,
+    phone: phoneIsComplete(form.phone) ? '' : c.errors.phone,
     message: form.message.trim().length > 4 ? '' : c.errors.message,
   }
   const firstProblem = Object.values(problems).find(Boolean) || ''
@@ -76,9 +70,9 @@ export default function Contact() {
     setSending(true)
     setError('')
     try {
-      await submitFeedback(form)
+      await submitFeedback({ ...form, phone: phoneToString(form.phone) })
       setSent(true)
-      setForm({ fullName: '', email: '', phone: '+996 ', message: '' })
+      setForm({ fullName: '', email: '', phone: EMPTY_PHONE, message: '' })
       setTouched({})
       setConsent(false)
     } catch (err) {
@@ -180,16 +174,11 @@ export default function Contact() {
 
                 <label className="reg-field">
                   <span className="reg-label mono">{c.fields.phone}</span>
-                  <input
-                    type="tel"
+                  <PhoneField
                     value={form.phone}
                     onChange={set('phone')}
                     onBlur={markTouched('phone')}
-                    placeholder={c.fields.phonePlaceholder}
-                    maxLength={18}
-                    autoComplete="tel"
-                    inputMode="numeric"
-                    aria-invalid={touched.phone && !!problems.phone}
+                    invalid={touched.phone && !!problems.phone}
                   />
                   {touched.phone && problems.phone && (
                     <span className="contact-invalid">{problems.phone}</span>

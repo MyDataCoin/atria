@@ -15,7 +15,8 @@ import {
 import { openDiditVerification } from '../lib/didit.js'
 import { postConsent } from '../lib/consent.js'
 import { ApiError, tokens, onSessionLost } from '../lib/api.js'
-import { COUNTRIES, DEFAULT_COUNTRY, countryByIso, groupDigits } from '../lib/countries.js'
+import { DEFAULT_COUNTRY, countryByIso, groupDigits } from '../lib/countries.js'
+import PhoneField from './PhoneField.jsx'
 import DocModal from './DocModal.jsx'
 import { CONSENT_FORM } from '../content.consent.js'
 
@@ -257,18 +258,10 @@ export default function Registration({ mode, onClose, onSuccess }) {
     return () => clearInterval(t)
   }, [resendIn])
 
-  const handlePhoneChange = (e) => {
+  const handlePhoneChange = (next) => {
     setError('')
-    let digits = e.target.value.replace(/\D/g, '')
-    // Вставили номер целиком, с кодом страны: код отрезаем, а если он другой — переключаем страну.
-    if (e.target.value.trim().startsWith('+')) {
-      const match = [...COUNTRIES].sort((a, b) => b.code.length - a.code.length).find((c) => digits.startsWith(c.code))
-      if (match) {
-        if (match.code !== country.code) setCountryIso(match.iso)
-        digits = digits.slice(match.code.length)
-      }
-    }
-    setNational(digits.slice(0, 12))
+    if (next.iso !== countryIso) setCountryIso(next.iso)
+    setNational(next.national)
   }
 
   const handleSendCode = async (e) => {
@@ -589,33 +582,11 @@ export default function Registration({ mode, onClose, onSuccess }) {
                   <form onSubmit={handleSendCode} className="reg-form">
                     <label className="reg-field">
                       <span className="reg-label mono">Номер телефона</span>
-                      <div className="reg-phone-row">
-                        <select
-                          className="reg-country"
-                          value={countryIso}
-                          onChange={(e) => {
-                            setCountryIso(e.target.value)
-                            setError('')
-                          }}
-                          aria-label="Страна"
-                        >
-                          {COUNTRIES.map((c) => (
-                            <option key={c.iso} value={c.iso}>
-                              {c.name} +{c.code}
-                            </option>
-                          ))}
-                        </select>
-                        <span className="reg-code-prefix" aria-hidden="true">+{country.code}</span>
-                        <input
-                          type="tel"
-                          inputMode="numeric"
-                          autoComplete="tel-national"
-                          value={groupDigits(national)}
-                          onChange={handlePhoneChange}
-                          placeholder={groupDigits('7'.repeat(country.min)).replace(/7/g, '0')}
-                          autoFocus
-                        />
-                      </div>
+                      <PhoneField
+                        value={{ iso: countryIso, national }}
+                        onChange={handlePhoneChange}
+                        autoFocus
+                      />
                     </label>
 
                     {error && <div className="reg-error">{error}</div>}
