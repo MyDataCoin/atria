@@ -4887,3 +4887,29 @@ a.details-unit {
     font-size: 1.15rem;
   }
 }
+
+/* Login bot step on the code screen */
+.reg-bot {
+  margin: 0.4rem 0 1.4rem;
+  padding: 1rem 1.1rem;
+  border-radius: 10px;
+  background: var(--bone);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+.reg-bot ol {
+  margin: 0 0 0.9rem;
+  padding-left: 1.1rem;
+}
+.reg-bot li + li {
+  margin-top: 0.3rem;
+}
+.reg-bot-btn {
+  width: 100%;
+  justify-content: center;
+}
+.reg-bot-note {
+  margin-top: 0.6rem;
+  font-size: 0.8rem;
+  color: var(--ink-3);
+}
