@@ -14,7 +14,7 @@ import {
 } from '../lib/kyc.js'
 import { openDiditVerification } from '../lib/didit.js'
 import { postConsent } from '../lib/consent.js'
-import { ApiError, apiFetch, tokens, onSessionLost } from '../lib/api.js'
+import { ApiError, tokens, onSessionLost } from '../lib/api.js'
 import DocModal from './DocModal.jsx'
 import { CONSENT_FORM } from '../content.consent.js'
 
@@ -86,21 +86,8 @@ function verifyErrorMessage(err) {
  *   const [mode, setMode] = useState(null) // null | 'register' | 'login'
  *   <Registration mode={mode} onClose={() => setMode(null)} onSuccess={(p) => ...} />
  */
-const LOGIN_BOT_FALLBACK = 'https://t.me/atria_login_bot'
-
-/** Сервер ответил «номер не привязан к боту входа». */
-const isBotLinkRequired = (err) =>
-  err instanceof ApiError && err.problem?.title === 'otp.telegram_link_required'
-
-/** Ссылка на бота входа с сервера; при сбое — известный адрес, чтобы человек не упёрся в тупик. */
-async function getLoginBotUrl() {
-  try {
-    const bot = await apiFetch('/telegram/bot')
-    return bot?.url || LOGIN_BOT_FALLBACK
-  } catch {
-    return LOGIN_BOT_FALLBACK
-  }
-}
+// Бот входа: коды приходят туда. Первый раз человек делится в нём номером, дальше код приходит сам.
+const LOGIN_BOT_URL = import.meta.env.VITE_LOGIN_BOT_URL || 'https://t.me/atria_login_bot'
 
 export default function Registration({ mode, onClose, onSuccess }) {
   const isOpen = mode === 'register' || mode === 'login'
@@ -128,8 +115,6 @@ export default function Registration({ mode, onClose, onSuccess }) {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [resendIn, setResendIn] = useState(0)
-  // Ссылка на бота входа, когда номер ещё не привязан к Telegram: код придёт туда после «Поделиться номером».
-  const [botUrl, setBotUrl] = useState(null)
   const [justResent, setJustResent] = useState(false)
   const [wallet, setWallet] = useState('') // адрес криптокошелька инвестора
   // Одобрен ли KYC на самом деле. Итоговый экран показывается и тому, кто ещё ждёт решения,
@@ -326,19 +311,12 @@ export default function Registration({ mode, onClose, onSuccess }) {
     setLoading(true)
     try {
       await requestOtp(phone)
-      setBotUrl(null)
       setStep(2)
       setResendIn(RESEND_SECONDS)
       setCode(Array(CODE_LENGTH).fill(''))
       setTimeout(() => inputsRef.current[0]?.focus(), 50)
     } catch (err) {
-      if (isBotLinkRequired(err)) {
-        // Номер ещё не знаком боту: тот же экран ввода кода, плюс шаг «откройте бота».
-        setBotUrl(await getLoginBotUrl())
-        setStep(2)
-        setResendIn(RESEND_SECONDS)
-        setCode(Array(CODE_LENGTH).fill(''))
-      } else if (err instanceof ApiError && err.status === 409) {
+      if (err instanceof ApiError && err.status === 409) {
         setError('Слишком много запросов кода. Попробуйте позже')
       } else if (err instanceof ApiError && err.status === 502) {
         setError('Не удалось отправить код. Попробуйте через минуту')
@@ -418,17 +396,13 @@ export default function Registration({ mode, onClose, onSuccess }) {
     setLoading(true)
     try {
       await requestOtp(phone)
-      setBotUrl(null)
       setResendIn(RESEND_SECONDS)
       setCode(Array(CODE_LENGTH).fill(''))
       setJustResent(true)
       setTimeout(() => setJustResent(false), 2400)
       setTimeout(() => inputsRef.current[0]?.focus(), 50)
     } catch (err) {
-      if (isBotLinkRequired(err)) {
-        setBotUrl(await getLoginBotUrl())
-        setResendIn(RESEND_SECONDS)
-      } else if (err instanceof ApiError && err.status === 409) {
+      if (err instanceof ApiError && err.status === 409) {
         setError('Слишком много запросов кода. Попробуйте позже')
       } else {
         setError('Не удалось отправить код повторно')
@@ -650,25 +624,15 @@ export default function Registration({ mode, onClose, onSuccess }) {
                   transition={{ duration: 0.35, ease: EASE }}
                 >
                   <h2 className="reg-title display">Введите код из Telegram</h2>
-                  {botUrl ? (
-                    <div className="reg-bot">
-                      <ol>
-                        <li>Откройте бота ATRIA в Telegram.</li>
-                        <li>
-                          Нажмите «Поделиться номером» — номер в Telegram должен быть <span className="reg-phone">{phone}</span>.
-                        </li>
-                        <li>Бот пришлёт код — введите его ниже.</li>
-                      </ol>
-                      <a className="btn btn-primary reg-bot-btn" href={botUrl} target="_blank" rel="noopener noreferrer">
-                        <span>Открыть бота в Telegram</span>
-                      </a>
-                      <p className="reg-bot-note">В следующий раз код придёт в бота сразу.</p>
-                    </div>
-                  ) : (
-                    <p className="reg-sub">
-                      Код отправлен в Telegram, в чат с ботом ATRIA, для номера <span className="reg-phone">{phone}</span>
+                  <div className="reg-bot">
+                    <p>
+                      Код придёт в Telegram от бота ATRIA. <b>Первый раз?</b> Откройте бота и нажмите
+                      «Поделиться номером» — номер в Telegram должен быть <span className="reg-phone">{phone}</span>.
                     </p>
-                  )}
+                    <a className="btn btn-ghost reg-bot-btn" href={LOGIN_BOT_URL} target="_blank" rel="noopener noreferrer">
+                      <span>Открыть бота в Telegram</span>
+                    </a>
+                  </div>
 
                   <form onSubmit={handleVerify} className="reg-form">
                     <div className="reg-code-row">

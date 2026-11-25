@@ -4897,12 +4897,8 @@ a.details-unit {
   font-size: 0.9rem;
   line-height: 1.55;
 }
-.reg-bot ol {
-  margin: 0 0 0.9rem;
-  padding-left: 1.1rem;
-}
-.reg-bot li + li {
-  margin-top: 0.3rem;
+.reg-bot p {
+  margin: 0 0 0.8rem;
 }
 .reg-bot-btn {
   width: 100%;
