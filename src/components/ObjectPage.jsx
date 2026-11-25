@@ -77,7 +77,24 @@ export default function ObjectPage({ route }) {
           )}
         </nav>
 
-        {state.status === 'loading' && <p className="s-note">Загружаем объект…</p>}
+        {state.status === 'loading' && (
+          // Скелет повторяет раскладку страницы объекта: место под заголовок, галерею, цифры и текст
+          // занято сразу, и при загрузке ничего не прыгает.
+          <div className="objpage-skeleton" role="status" aria-label="Загружаем объект">
+            <span className="sk sk-eyebrow" />
+            <span className="sk sk-title" />
+            <span className="sk sk-sub" />
+            <span className="sk sk-gallery" />
+            <div className="sk-stats">
+              {[0, 1, 2, 3].map((i) => (
+                <span key={i} className="sk sk-stat" />
+              ))}
+            </div>
+            <span className="sk sk-line" />
+            <span className="sk sk-line" />
+            <span className="sk sk-line sk-line-short" />
+          </div>
+        )}
         {state.status === 'missing' && (
           <div className="objpage-missing">
             <h1 className="display">Объект не найден</h1>

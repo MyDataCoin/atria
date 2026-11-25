@@ -1,15 +1,16 @@
-// Авторизация: phone-OTP флоу Кыргызстана (+996) поверх Atria API.
+// Авторизация по номеру телефона (любая страна, по умолчанию Кыргызстан) поверх Atria API.
 // Эндпоинты: POST /auth/register/phone/request-otp и /auth/register/phone/verify-otp.
 
 import { apiFetch, tokens } from './api.js'
 
 /**
- * Приводит маску '+996 700 123 456' к формату API '996700123456' (без +).
- * Принимает как сырые цифры, так и уже отформатированную строку.
+ * Номер для API: «+» и цифры (E.164), например '+996700123456' или '+420774958325'.
+ * Строка без «+» считается кыргызской — так её понимает и сервер.
  */
 export function toApiPhone(input) {
-  const digits = String(input).replace(/\D/g, '').replace(/^996/, '').slice(0, 9)
-  return `996${digits}`
+  const raw = String(input).trim()
+  const digits = raw.replace(/\D/g, '')
+  return raw.startsWith('+') ? `+${digits}` : digits
 }
 
 /**

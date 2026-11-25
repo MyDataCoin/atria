@@ -15,6 +15,7 @@ import {
 import { openDiditVerification } from '../lib/didit.js'
 import { postConsent } from '../lib/consent.js'
 import { ApiError, tokens, onSessionLost } from '../lib/api.js'
+import { COUNTRIES, DEFAULT_COUNTRY, countryByIso, groupDigits } from '../lib/countries.js'
 import DocModal from './DocModal.jsx'
 import { CONSENT_FORM } from '../content.consent.js'
 
@@ -30,25 +31,6 @@ const RESEND_SECONDS = 30
 // Флоу регистрации по номеру НЕ удалён — управляется этим флагом.
 // true = сразу KYC (для отладки), false = обычный путь: телефон → код → успех → KYC.
 const KYC_ONLY_DEV = false
-
-/**
- * Formats raw digits into a KG-style phone mask: +996 XXX XXX XXX
- */
-function formatPhone(raw) {
-  const digits = raw.replace(/\D/g, '').replace(/^996/, '').slice(0, 9)
-  const p1 = digits.slice(0, 3)
-  const p2 = digits.slice(3, 6)
-  const p3 = digits.slice(6, 9)
-  let out = '+996'
-  if (p1) out += ' ' + p1
-  if (p2) out += ' ' + p2
-  if (p3) out += ' ' + p3
-  return out
-}
-
-function digitsOnly(formatted) {
-  return formatted.replace(/\D/g, '').replace(/^996/, '')
-}
 
 /**
  * Что на самом деле пошло не так при подтверждении кода. Свалить всё в «неверный код» —
@@ -110,7 +92,11 @@ export default function Registration({ mode, onClose, onSuccess }) {
   //        9 = final success, 10 = incomplete warning,
   //        11 = «не туда попали»: номер не зарегистрирован / уже зарегистрирован
   const [step, setStep] = useState(1)
-  const [phone, setPhone] = useState('+996 ')
+  // Номер = страна + национальные цифры. Полная строка собирается из них ниже.
+  const [countryIso, setCountryIso] = useState(DEFAULT_COUNTRY)
+  const [national, setNational] = useState('')
+  const country = countryByIso(countryIso)
+  const phone = `+${country.code} ${groupDigits(national)}`.trim()
   const [code, setCode] = useState(Array(CODE_LENGTH).fill(''))
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -125,13 +111,12 @@ export default function Registration({ mode, onClose, onSuccess }) {
 
   const inputsRef = useRef([])
 
-  const phoneDigits = digitsOnly(phone)
-  const phoneValid = phoneDigits.length === 9
+  const phoneValid = national.length >= country.min && national.length <= country.max
 
   // reset internal state whenever the modal is (re)opened or switches mode
   useEffect(() => {
     if (isOpen) {
-      setPhone('+996 ')
+      setNational('')
       setCode(Array(CODE_LENGTH).fill(''))
       setError('')
       setLoading(false)
@@ -274,7 +259,16 @@ export default function Registration({ mode, onClose, onSuccess }) {
 
   const handlePhoneChange = (e) => {
     setError('')
-    setPhone(formatPhone(e.target.value))
+    let digits = e.target.value.replace(/\D/g, '')
+    // Вставили номер целиком, с кодом страны: код отрезаем, а если он другой — переключаем страну.
+    if (e.target.value.trim().startsWith('+')) {
+      const match = [...COUNTRIES].sort((a, b) => b.code.length - a.code.length).find((c) => digits.startsWith(c.code))
+      if (match) {
+        if (match.code !== country.code) setCountryIso(match.iso)
+        digits = digits.slice(match.code.length)
+      }
+    }
+    setNational(digits.slice(0, 12))
   }
 
   const handleSendCode = async (e) => {
@@ -595,14 +589,33 @@ export default function Registration({ mode, onClose, onSuccess }) {
                   <form onSubmit={handleSendCode} className="reg-form">
                     <label className="reg-field">
                       <span className="reg-label mono">Номер телефона</span>
-                      <input
-                        type="tel"
-                        inputMode="numeric"
-                        value={phone}
-                        onChange={handlePhoneChange}
-                        placeholder="+996 XXX XXX XXX"
-                        autoFocus
-                      />
+                      <div className="reg-phone-row">
+                        <select
+                          className="reg-country"
+                          value={countryIso}
+                          onChange={(e) => {
+                            setCountryIso(e.target.value)
+                            setError('')
+                          }}
+                          aria-label="Страна"
+                        >
+                          {COUNTRIES.map((c) => (
+                            <option key={c.iso} value={c.iso}>
+                              {c.name} +{c.code}
+                            </option>
+                          ))}
+                        </select>
+                        <span className="reg-code-prefix" aria-hidden="true">+{country.code}</span>
+                        <input
+                          type="tel"
+                          inputMode="numeric"
+                          autoComplete="tel-national"
+                          value={groupDigits(national)}
+                          onChange={handlePhoneChange}
+                          placeholder={groupDigits('7'.repeat(country.min)).replace(/7/g, '0')}
+                          autoFocus
+                        />
+                      </div>
                     </label>
 
                     {error && <div className="reg-error">{error}</div>}
@@ -763,7 +776,7 @@ export default function Registration({ mode, onClose, onSuccess }) {
                   </h2>
                   <p className="reg-sub">
                     {switchPrompt === 'not-registered'
-                      ? `На номер ${phone.trim()} аккаунта пока нет. Пройдите регистрацию — это тот же номер и тот же код из СМС.`
+                      ? `На номер ${phone.trim()} аккаунта пока нет. Пройдите регистрацию — это тот же номер и тот же код из Telegram.`
                       : `Номер ${phone.trim()} уже используется. Войдите в существующий аккаунт — заводить второй не нужно.`}
                   </p>
                   <button

@@ -4909,3 +4909,94 @@ a.details-unit {
   font-size: 0.8rem;
   color: var(--ink-3);
 }
+
+/* Country + national number */
+.reg-phone-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 5.6rem 1fr;
+  gap: 0.5rem;
+}
+.reg-country {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  min-height: 60px;
+  font-size: 1.05rem;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  outline: none;
+  transition: border-color 0.3s var(--ease);
+  color: transparent;
+  cursor: pointer;
+}
+.reg-country:focus {
+  border-color: var(--amber);
+}
+.reg-code-prefix {
+  font-size: 1.05rem;
+  color: var(--ink);
+}
+.reg-country option {
+  color: var(--ink);
+}
+.reg-code-prefix {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 5.6rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  pointer-events: none;
+  font-variant-numeric: tabular-nums;
+}
+.reg-code-prefix::after {
+  content: '';
+  width: 0.4rem;
+  height: 0.4rem;
+  border-right: 1.5px solid var(--ink-3);
+  border-bottom: 1.5px solid var(--ink-3);
+  transform: translateY(-2px) rotate(45deg);
+}
+
+/* Object page skeleton */
+.objpage-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 2rem 0 3rem;
+}
+.sk {
+  display: block;
+  border-radius: 8px;
+  background: linear-gradient(90deg, #ececea 0%, #f6f6f4 40%, #ececea 80%);
+  background-size: 300% 100%;
+  animation: sk-shimmer 1.4s ease-in-out infinite;
+}
+.sk-eyebrow { width: 6rem; height: 0.8rem; }
+.sk-title { width: min(26rem, 80%); height: 2.6rem; }
+.sk-sub { width: min(34rem, 90%); height: 1rem; margin-bottom: 0.6rem; }
+.sk-gallery { width: 100%; aspect-ratio: 16 / 9; max-height: 520px; border-radius: 12px; }
+.sk-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.8rem;
+  margin: 0.4rem 0 0.8rem;
+}
+.sk-stat { height: 4.2rem; }
+.sk-line { width: 100%; height: 0.9rem; }
+.sk-line-short { width: 60%; }
+@media (max-width: 640px) {
+  .sk-stats { grid-template-columns: repeat(2, 1fr); }
+}
+@keyframes sk-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sk { animation: none; }
+}
