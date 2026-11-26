@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { createApplication } from '../lib/applications.js'
+import { createApplication, findOpenApplication } from '../lib/applications.js'
 import { getKycStatus, isKycApproved } from '../lib/kyc.js'
 import { ApiError, tokens } from '../lib/api.js'
 import Registration from './Registration.jsx'
@@ -97,6 +97,10 @@ export default function PurchaseModal({ property, onClose, onSuccess }) {
   const [error, setError] = useState('')
   const [showKyc, setShowKyc] = useState(false) // открыта ли модалка верификации
   const [applicationId, setApplicationId] = useState(null)
+  // Сумма заявки, которую оплачиваем: у новой — из калькулятора, у уже созданной — её собственная.
+  const [payAmount, setPayAmount] = useState(null)
+  // Неоплаченная заявка на этот же объект, если она есть.
+  const [openApp, setOpenApp] = useState(null)
 
   // Сброс при каждом открытии нового объекта.
   useEffect(() => {
@@ -107,8 +111,29 @@ export default function PurchaseModal({ property, onClose, onSuccess }) {
       setError('')
       setShowKyc(false)
       setApplicationId(null)
+      setPayAmount(null)
+      setOpenApp(null)
     }
   }, [isOpen, maxQty])
+
+  // Уже есть неоплаченная заявка на этот объект — предлагаем оплатить её, а не создавать вторую.
+  const propertyId = property?.id
+  useEffect(() => {
+    if (!isOpen || !propertyId || !tokens.isAuthed) return
+    let alive = true
+    findOpenApplication(propertyId)
+      .then((app) => alive && setOpenApp(app))
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [isOpen, propertyId])
+
+  const payExisting = () => {
+    setApplicationId(openApp.id)
+    setPayAmount(Number(openApp.amount) || 0)
+    setStatus('done')
+  }
 
   // Блокируем прокрутку страницы и закрываем по Escape.
   useEffect(() => {
@@ -239,7 +264,7 @@ export default function PurchaseModal({ property, onClose, onSuccess }) {
             {status === 'done' ? (
               <PaymentStep
                 investmentId={applicationId}
-                amountKgs={calc.investment}
+                amountKgs={payAmount ?? calc.investment}
                 currency={currency}
                 onClose={onClose}
               />
@@ -250,6 +275,28 @@ export default function PurchaseModal({ property, onClose, onSuccess }) {
                 <p className="buy-price-line">
                   Цена: <strong>{priceLabel}</strong>/токен
                 </p>
+
+                {openApp && (
+                  <div className="buy-open-app">
+                    <div>
+                      <strong>У вас есть неоплаченная заявка</strong>
+                      <p>
+                        {fmtQty(openApp.tokenCount)} ATR-S на {fmtMoney(openApp.amount)} {currency}. Резерв
+                        до{' '}
+                        {new Date(openApp.reservedUntilUtc).toLocaleString('ru-RU', {
+                          day: 'numeric',
+                          month: 'long',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                        .
+                      </p>
+                    </div>
+                    <button type="button" className="btn btn-primary" onClick={payExisting}>
+                      <span>Оплатить её</span>
+                    </button>
+                  </div>
+                )}
 
                 <hr className="buy-rule" />
 

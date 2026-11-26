@@ -3834,6 +3834,38 @@ button {
   color: var(--ink-2);
   margin: 0;
 }
+/* Неоплаченная заявка на этот же объект: оплатить её вместо создания новой */
+.buy-open-app {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 1rem;
+  padding: 0.9rem 1.1rem;
+  border: 1px solid color-mix(in srgb, var(--amber) 35%, var(--line));
+  background: color-mix(in srgb, var(--amber) 8%, transparent);
+  border-radius: 12px;
+}
+.buy-open-app strong {
+  display: block;
+  font-size: 0.92rem;
+  color: var(--ink);
+}
+.buy-open-app p {
+  font-size: 0.84rem;
+  line-height: 1.45;
+  color: var(--ink-2);
+  margin: 0.2rem 0 0;
+}
+.buy-open-app .btn {
+  flex-shrink: 0;
+}
+@media (max-width: 520px) {
+  .buy-open-app {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
 /* Гейт KYC: пока личность не подтверждена, покупка недоступна */
 .buy-kyc-gate {
   margin-top: 0.9rem;

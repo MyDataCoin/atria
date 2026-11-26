@@ -18,6 +18,26 @@ import { apiFetch } from './api.js'
  * @param {string} [referralToken] токен реферальной ссылки риелтора, если инвестор пришёл по ней
  * @returns {Promise<string>} uuid созданной заявки
  */
+/**
+ * Неоплаченная (Reserved, резерв ещё не истёк) заявка инвестора на этот объект — самая свежая,
+ * либо null. Нужна, чтобы повторное «Купить» предлагало оплатить уже созданную заявку, а не
+ * плодило новые резервы.
+ */
+export async function findOpenApplication(propertyId) {
+  const list = await apiFetch('/investments/me', { auth: true })
+  const now = Date.now()
+  return (
+    (Array.isArray(list) ? list : [])
+      .filter(
+        (a) =>
+          a.propertyId === propertyId &&
+          String(a.status).toLowerCase() === 'reserved' &&
+          new Date(a.reservedUntilUtc).getTime() > now,
+      )
+      .sort((a, b) => new Date(b.createdAtUtc) - new Date(a.createdAtUtc))[0] ?? null
+  )
+}
+
 export function createApplication(propertyId, amount, referralToken) {
   return apiFetch('/investments', {
     method: 'POST',
