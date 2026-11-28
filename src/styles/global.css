@@ -455,6 +455,9 @@ button {
   pointer-events: none;
   display: grid;
   grid-template-rows: auto 1fr auto;
+  /* minmax(0, 1fr): without it the column sizes to its widest unbreakable line (the coordinates)
+     and on a phone the headline and subtitle run off the right edge. */
+  grid-template-columns: minmax(0, 1fr);
   padding: clamp(5.5rem, 11vh, 8rem) var(--gutter) clamp(1.5rem, 4vh, 3rem);
 }
 .bhero-top {
@@ -489,6 +492,8 @@ button {
   font-size: clamp(1rem, 1.3vw, 1.18rem);
   font-weight: 300;
   color: var(--ink-2);
+  /* The subtitle can sit over the neighbouring buildings of the 3D scene; a soft halo keeps it legible. */
+  text-shadow: 0 1px 12px var(--bone), 0 0 3px var(--bone);
 }
 .bhero-cta {
   display: flex;
@@ -684,6 +689,10 @@ button {
     align-self: end;
     max-width: none;
     padding-bottom: 4rem;
+  }
+  /* Decorative coordinates: no room for them next to the eyebrow on a phone. */
+  .bhero-top > .mono {
+    display: none;
   }
   .bhero-headline h1 {
     font-size: clamp(1.9rem, 7.4vw, 2.6rem);
